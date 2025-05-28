@@ -68,7 +68,7 @@ func New(cfg *config.Config, opts ...Option) (*Server, error) {
 		SameSite: http.SameSiteLaxMode,
 	}
 	e.Use(session.Middleware(cookieStore))
-	
+
 	// Print debug message about session configuration
 	fmt.Printf("DEBUG server: Session middleware configured with key length: %d\n", len(cfg.Server.SessionKey))
 

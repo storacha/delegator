@@ -124,6 +124,22 @@ export DELEGATOR_AWS_REGION=us-west-2
 export DELEGATOR_DATABASE_TABLE_NAME=providers
 ```
 
+### Custom Help Texts
+
+The onboarding interface includes help text for users. This text is dynamically generated and can include configuration values:
+
+```yaml
+onboarding:
+  service_name: "Storacha"
+  help_text_settings:
+    service_did: "did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"
+    extra_capabilities: "store/get store/list"
+    node_config_options: "--auto-respond --timeout 30"
+    did_flags: "--output-key --output-format=jwk"
+```
+
+See [HELP_TEXTS.md](HELP_TEXTS.md) for complete documentation on customizing help text.
+
 ## Development
 
 The project follows standard Go project layout with:

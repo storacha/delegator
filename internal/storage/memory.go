@@ -64,19 +64,19 @@ func (m *MemoryStore) ListAllowedDIDs() ([]*models.DIDAllowlist, error) {
 func (m *MemoryStore) CreateSession(session *models.OnboardingSession) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
-	fmt.Printf("DEBUG MemoryStore.CreateSession: Creating session with ID: %s, DID: %s\n", 
+
+	fmt.Printf("DEBUG MemoryStore.CreateSession: Creating session with ID: %s, DID: %s\n",
 		session.SessionID, session.DID)
-	
+
 	m.sessions[session.SessionID] = session
-	
+
 	// Dump all current sessions for debugging
 	fmt.Println("DEBUG MemoryStore: Current sessions:")
 	for id, s := range m.sessions {
-		fmt.Printf("  - %s: DID=%s, Status=%s, Expires=%s\n", 
+		fmt.Printf("  - %s: DID=%s, Status=%s, Expires=%s\n",
 			id, s.DID, s.Status, s.ExpiresAt.Format(time.RFC3339))
 	}
-	
+
 	return nil
 }
 
@@ -85,11 +85,11 @@ func (m *MemoryStore) GetSession(sessionID string) (*models.OnboardingSession, e
 	defer m.mu.RUnlock()
 
 	fmt.Printf("DEBUG MemoryStore.GetSession: Looking for session ID: %s\n", sessionID)
-	
+
 	// Dump all current sessions for debugging
 	fmt.Println("DEBUG MemoryStore: Available sessions:")
 	for id, s := range m.sessions {
-		fmt.Printf("  - %s: DID=%s, Status=%s, Expires=%s\n", 
+		fmt.Printf("  - %s: DID=%s, Status=%s, Expires=%s\n",
 			id, s.DID, s.Status, s.ExpiresAt.Format(time.RFC3339))
 	}
 
@@ -101,14 +101,14 @@ func (m *MemoryStore) GetSession(sessionID string) (*models.OnboardingSession, e
 
 	// Check if session is expired
 	if time.Now().After(session.ExpiresAt) {
-		fmt.Printf("DEBUG MemoryStore.GetSession: Session expired: %s, expired at %s\n", 
+		fmt.Printf("DEBUG MemoryStore.GetSession: Session expired: %s, expired at %s\n",
 			sessionID, session.ExpiresAt.Format(time.RFC3339))
 		return nil, fmt.Errorf("session expired: %s", sessionID)
 	}
 
-	fmt.Printf("DEBUG MemoryStore.GetSession: Found session: ID=%s, DID=%s, Status=%s\n", 
+	fmt.Printf("DEBUG MemoryStore.GetSession: Found session: ID=%s, DID=%s, Status=%s\n",
 		session.SessionID, session.DID, session.Status)
-	
+
 	return session, nil
 }
 

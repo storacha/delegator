@@ -1,7 +1,7 @@
 # Delegator Service Configuration
 
 server:
-  host: localhost
+  host: 0.0.0.0
   port: 8080
   read_timeout: 30
   write_timeout: 30
@@ -30,6 +30,12 @@ onboarding:
   upload_service_key: "MgCbeqcVqMcLs/4a7nKvHwcQLAggz+gZNDFykd9mXINLtY+0Buvk0hCp2CxihinQmNocYu+Q495YWgafn582g3UOJ93A="
   allowed_dids:
     - "did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"
+  service_name: "Storacha"
+  help_text_settings:
+    service_did: "did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"
+    extra_capabilities: "store/get store/list"
+    node_config_options: "--auto-respond --timeout 30"
+    did_flags: "--output-key --output-format=jwk"
 
 dynamodb:
   allowlist_table: "allowed-dids"

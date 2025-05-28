@@ -23,6 +23,7 @@ type OnboardingTemplateData struct {
 	NextStep           string
 	FormData           *FormData
 	RequestedSessionID string
+	HelpTexts          models.OnboardingHelpTexts
 }
 
 // FormData represents form input data
@@ -43,8 +44,9 @@ func (h *WebHandler) OnboardingIndex(c echo.Context) error {
 			Title:     "WSP Onboarding",
 			SessionID: sessionID,
 		},
-		Step:     1, // Default to step 1
-		FormData: &FormData{},
+		Step:      1, // Default to step 1
+		FormData:  &FormData{},
+		HelpTexts: h.getHelpTexts(),
 	}
 
 	// If session ID is provided, get session and determine step
@@ -95,6 +97,7 @@ func (h *WebHandler) RegisterDID(c echo.Context) error {
 		FormData: &FormData{
 			DID: didStr,
 		},
+		HelpTexts: h.getHelpTexts(),
 	}
 
 	// Validate input
@@ -189,6 +192,7 @@ func (h *WebHandler) RegisterFQDN(c echo.Context) error {
 		FormData: &FormData{
 			URL: urlStr,
 		},
+		HelpTexts: h.getHelpTexts(),
 	}
 
 	// Get session from storage
@@ -283,6 +287,7 @@ func (h *WebHandler) RegisterProof(c echo.Context) error {
 		FormData: &FormData{
 			Proof: proof,
 		},
+		HelpTexts: h.getHelpTexts(),
 	}
 
 	// Get session
@@ -347,6 +352,7 @@ func (h *WebHandler) SessionStatus(c echo.Context) error {
 			SessionID: sessionID,
 		},
 		RequestedSessionID: sessionID,
+		HelpTexts:          h.getHelpTexts(),
 	}
 
 	if sessionID == "" {
@@ -396,8 +402,8 @@ func (h *WebHandler) GetDelegation(c echo.Context) error {
 	}
 
 	// Return as downloadable file
-	c.Response().Header().Set("Content-Type", "application/json")
-	c.Response().Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=delegation-%s.json", sessionID))
+	c.Response().Header().Set("Content-Type", "application/octet-stream")
+	c.Response().Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=delegation-%s.b64", sessionID))
 	return c.Blob(http.StatusOK, "application/octet-stream", []byte(delegationData))
 }
 
@@ -405,6 +411,19 @@ func (h *WebHandler) GetDelegation(c echo.Context) error {
 
 func (h *WebHandler) createOnboardingService() (*services.OnboardingService, error) {
 	return services.NewOnboardingServiceFromConfig(h.store, h.config.Onboarding)
+}
+
+// SetHelpTexts allows overriding the default help texts
+func (h *WebHandler) SetHelpTexts(helpTexts models.OnboardingHelpTexts) {
+	h.helpTexts = &helpTexts
+}
+
+// getHelpTexts returns the current help texts, falling back to defaults if none are set
+func (h *WebHandler) getHelpTexts() models.OnboardingHelpTexts {
+	if h.helpTexts != nil {
+		return *h.helpTexts
+	}
+	return models.DefaultOnboardingHelpTexts
 }
 
 func (h *WebHandler) getStepFromStatus(status string) int {

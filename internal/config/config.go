@@ -27,6 +27,7 @@ type OnboardingConfig struct {
 	IndexingServiceKey      string        `mapstructure:"indexing_service_key"`
 	UploadServiceKey        string        `mapstructure:"upload_service_key"`
 	AllowedDIDs             []string      `mapstructure:"allowed_dids"`
+	ServiceName             string        `mapstructure:"service_name"`
 }
 
 // DynamoDBConfig holds DynamoDB table configuration
@@ -136,6 +137,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("onboarding.fqdn_verification_timeout", 30)
 	v.SetDefault("onboarding.max_retries", 3)
 	v.SetDefault("onboarding.allowed_dids", []string{})
+	v.SetDefault("onboarding.service_name", "Storacha")
+	v.SetDefault("onboarding.help_text_settings", map[string]string{})
 
 	// DynamoDB defaults
 	v.SetDefault("dynamodb.allowlist_table", "allowed-dids")

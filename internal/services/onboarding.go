@@ -63,7 +63,7 @@ var (
 )
 
 // RegisterDID performs Step 3.1: DID registration, verification and delegation generation
-func (s *OnboardingService) RegisterDID(strgDID did.DID) (*models.DIDVerifyResponse, error) {
+func (s *OnboardingService) RegisterDID(strgDID did.DID, filecoinAddress string, proofSetID uint64, operatorEmail string) (*models.DIDVerifyResponse, error) {
 	// Check if DID is in allowlist
 	if !s.store.IsAllowedDID(strgDID.String()) {
 		return nil, ErrIsNotAllowed
@@ -79,8 +79,11 @@ func (s *OnboardingService) RegisterDID(strgDID did.DID) (*models.DIDVerifyRespo
 		// Return existing session if still valid
 		if time.Now().Before(existingSession.ExpiresAt) {
 			return &models.DIDVerifyResponse{
-				SessionID:     existingSession.SessionID,
-				DelegationURL: fmt.Sprintf("/api/v1/onboard/delegation/%s", existingSession.SessionID),
+				SessionID:       existingSession.SessionID,
+				DelegationURL:   fmt.Sprintf("/api/v1/onboard/delegation/%s", existingSession.SessionID),
+				FilecoinAddress: existingSession.FilecoinAddress,
+				ProofSetID:      existingSession.ProofSetID,
+				OperatorEmail:   existingSession.OperatorEmail,
 			}, nil
 		}
 	}
@@ -96,13 +99,16 @@ func (s *OnboardingService) RegisterDID(strgDID did.DID) (*models.DIDVerifyRespo
 	}
 
 	session := &models.OnboardingSession{
-		SessionID:      sessionID,
-		DID:            strgDID.String(),
-		Status:         models.StatusDIDVerified,
-		DelegationData: delegationData,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-		ExpiresAt:      now.Add(s.sessionTimeout),
+		SessionID:       sessionID,
+		DID:             strgDID.String(),
+		Status:          models.StatusDIDVerified,
+		DelegationData:  delegationData,
+		FilecoinAddress: filecoinAddress,
+		ProofSetID:      proofSetID,
+		OperatorEmail:   operatorEmail,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		ExpiresAt:       now.Add(s.sessionTimeout),
 	}
 
 	if err := s.store.CreateSession(session); err != nil {
@@ -110,8 +116,11 @@ func (s *OnboardingService) RegisterDID(strgDID did.DID) (*models.DIDVerifyRespo
 	}
 
 	return &models.DIDVerifyResponse{
-		SessionID:     sessionID,
-		DelegationURL: fmt.Sprintf("/api/v1/onboard/delegation/%s", sessionID),
+		SessionID:       sessionID,
+		DelegationURL:   fmt.Sprintf("/api/v1/onboard/delegation/%s", sessionID),
+		FilecoinAddress: filecoinAddress,
+		ProofSetID:      proofSetID,
+		OperatorEmail:   operatorEmail,
 	}, nil
 }
 
@@ -125,12 +134,15 @@ func (s *OnboardingService) GetSessionStatus(sessionID string) (*models.Onboardi
 	nextStep := s.getNextStep(session.Status)
 
 	return &models.OnboardingStatusResponse{
-		SessionID: session.SessionID,
-		DID:       session.DID,
-		Status:    session.Status,
-		CreatedAt: session.CreatedAt.Format(time.RFC3339),
-		ExpiresAt: session.ExpiresAt.Format(time.RFC3339),
-		NextStep:  nextStep,
+		SessionID:       session.SessionID,
+		DID:             session.DID,
+		Status:          session.Status,
+		FilecoinAddress: session.FilecoinAddress,
+		ProofSetID:      session.ProofSetID,
+		OperatorEmail:   session.OperatorEmail,
+		CreatedAt:       session.CreatedAt.Format(time.RFC3339),
+		ExpiresAt:       session.ExpiresAt.Format(time.RFC3339),
+		NextStep:        nextStep,
 	}, nil
 }
 
@@ -429,6 +441,23 @@ func (s *OnboardingService) storeProvider(session *models.OnboardingSession) err
 	// Store in the provider registry
 	if err := s.store.CreateProvider(provider); err != nil {
 		return fmt.Errorf("failed to create provider: %w", err)
+	}
+
+	// Store provider info with Filecoin address, ProofSetID, and OperatorEmail
+	providerInfo := &models.StorageProviderInfo{
+		Provider:      session.DID,
+		Endpoint:      session.FQDN,
+		Address:       session.FilecoinAddress,
+		ProofSet:      fmt.Sprintf("%d", session.ProofSetID), // Convert to string as per the model
+		OperatorEmail: session.OperatorEmail,
+		InsertedAt:    now,
+		UpdatedAt:     now,
+	}
+
+	// Assuming a CreateProviderInfo method exists in the store
+	// If it doesn't, you'll need to add this method to the storage interface
+	if err := s.store.CreateProviderInfo(providerInfo); err != nil {
+		return fmt.Errorf("failed to create provider info: %w", err)
 	}
 
 	return nil

@@ -25,6 +25,21 @@
                     <span class="detail-value"><code>{{.Session.DID}}</code></span>
                 </div>
                 
+                <div class="detail-item">
+                    <span class="detail-label">Filecoin Address:</span>
+                    <span class="detail-value"><code>{{.Session.FilecoinAddress}}</code></span>
+                </div>
+                
+                <div class="detail-item">
+                    <span class="detail-label">Proof Set ID:</span>
+                    <span class="detail-value"><code>{{.Session.ProofSetID}}</code></span>
+                </div>
+                
+                <div class="detail-item">
+                    <span class="detail-label">Operator Email:</span>
+                    <span class="detail-value"><code>{{.Session.OperatorEmail}}</code></span>
+                </div>
+                
                 {{if .Session.FQDN}}
                 <div class="detail-item">
                     <span class="detail-label">FQDN:</span>
@@ -88,7 +103,7 @@
     </div>
     {{end}}
     
-    {{if .Session.DelegationData}}
+    {{if and .Session.DelegationData (or (eq .Session.Status "proof_verified") (eq .Session.Status "completed"))}}
     <div class="delegation-card">
         <h2>Delegation</h2>
         <p>Your delegation is ready for download:</p>
@@ -145,7 +160,7 @@
         </div>
         
         <div class="help-actions">
-            <a href="/onboard" class="btn btn-primary">Start New Onboarding</a>
+            <a href="/onboard/new" class="btn btn-primary">Start New Onboarding</a>
             <a href="/" class="btn btn-secondary">Return to Dashboard</a>
         </div>
     </div>

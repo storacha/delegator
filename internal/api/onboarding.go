@@ -168,6 +168,30 @@ func (h *OnboardingHandler) registerDID(c echo.Context) error {
 		})
 	}
 
+	if req.FilecoinAddress == "" {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "missing_filecoin_address",
+			Message: "Filecoin Address is required",
+			Code:    http.StatusBadRequest,
+		})
+	}
+
+	if req.ProofSetID == 0 {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "missing_proof_set_id",
+			Message: "Proof Set ID is required and must be greater than 0",
+			Code:    http.StatusBadRequest,
+		})
+	}
+
+	if req.OperatorEmail == "" {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "missing_operator_email",
+			Message: "Operator Email is required",
+			Code:    http.StatusBadRequest,
+		})
+	}
+
 	strgDID, err := did.Parse(req.DID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
@@ -177,7 +201,7 @@ func (h *OnboardingHandler) registerDID(c echo.Context) error {
 		})
 	}
 
-	resp, err := h.service.RegisterDID(strgDID)
+	resp, err := h.service.RegisterDID(strgDID, req.FilecoinAddress, req.ProofSetID, req.OperatorEmail)
 	if err != nil {
 		if errors.Is(err, services.ErrIsNotAllowed) {
 			return c.JSON(http.StatusForbidden, models.ErrorResponse{

@@ -133,7 +133,6 @@ func TestRegisterDID(t *testing.T) {
 				Data: models.DIDVerifyResponse{
 					SessionID:     "session123",
 					DelegationURL: "http://example.com/delegation",
-					Instructions:  "Follow these steps: 1. Download delegation 2. Configure node",
 				},
 			},
 			wantErr: false,
@@ -230,10 +229,9 @@ func TestRegisterFQDN(t *testing.T) {
 				Success: true,
 				Message: "FQDN registered successfully",
 				Data: models.FQDNVerifyResponse{
-					SessionID:    "session123",
-					Status:       "fqdn_verified",
-					FQDN:         "example.com",
-					Instructions: "Proceed to proof submission",
+					SessionID: "session123",
+					Status:    "fqdn_verified",
+					FQDN:      "example.com",
 				},
 			},
 			wantErr: false,

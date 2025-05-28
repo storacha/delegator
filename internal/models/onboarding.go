@@ -4,15 +4,18 @@ import "time"
 
 // OnboardingSession tracks multi-step onboarding progress
 type OnboardingSession struct {
-	SessionID      string    `json:"session_id" db:"session_id"`
-	DID            string    `json:"did" db:"did"`
-	Status         string    `json:"status" db:"status"`
-	DelegationData string    `json:"delegation_data,omitempty" db:"delegation_data"`
-	FQDN           string    `json:"fqdn,omitempty" db:"fqdn"`
-	Proof          string    `json:"proof,omitempty" db:"proof"`
-	CreatedAt      time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
-	ExpiresAt      time.Time `json:"expires_at" db:"expires_at"`
+	SessionID       string    `json:"session_id" db:"session_id"`
+	DID             string    `json:"did" db:"did"`
+	Status          string    `json:"status" db:"status"`
+	DelegationData  string    `json:"delegation_data,omitempty" db:"delegation_data"`
+	FQDN            string    `json:"fqdn,omitempty" db:"fqdn"`
+	Proof           string    `json:"proof,omitempty" db:"proof"`
+	FilecoinAddress string    `json:"filecoin_address,omitempty" db:"filecoin_address"`
+	ProofSetID      uint64    `json:"proof_set_id,omitempty" db:"proof_set_id"`
+	OperatorEmail   string    `json:"operator_email,omitempty" db:"operator_email"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
+	ExpiresAt       time.Time `json:"expires_at" db:"expires_at"`
 }
 
 // OnboardingSession status constants
@@ -56,7 +59,10 @@ type StorageProviderInfo struct {
 
 // DIDRegisterRequest represents the request for DID verification
 type DIDRegisterRequest struct {
-	DID string `json:"did" validate:"required"`
+	DID             string `json:"did" validate:"required"`
+	FilecoinAddress string `json:"filecoin_address" validate:"required"`
+	ProofSetID      uint64 `json:"proof_set_id" validate:"required"`
+	OperatorEmail   string `json:"operator_email" validate:"required"`
 }
 
 type FQDNRegisterRequest struct {
@@ -71,8 +77,11 @@ type ProofRegisterRequest struct {
 
 // DIDVerifyResponse represents the response for DID verification
 type DIDVerifyResponse struct {
-	SessionID     string `json:"session_id"`
-	DelegationURL string `json:"delegation_url"`
+	SessionID       string `json:"session_id"`
+	DelegationURL   string `json:"delegation_url"`
+	FilecoinAddress string `json:"filecoin_address"`
+	ProofSetID      uint64 `json:"proof_set_id"`
+	OperatorEmail   string `json:"operator_email"`
 }
 
 // FQDNVerifyResponse represents the response for FQDN verification
@@ -90,10 +99,13 @@ type ProofVerifyResponse struct {
 
 // OnboardingStatusResponse represents the status of an onboarding session
 type OnboardingStatusResponse struct {
-	SessionID string `json:"session_id"`
-	DID       string `json:"did"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
-	ExpiresAt string `json:"expires_at"`
-	NextStep  string `json:"next_step,omitempty"`
+	SessionID       string `json:"session_id"`
+	DID             string `json:"did"`
+	Status          string `json:"status"`
+	FilecoinAddress string `json:"filecoin_address,omitempty"`
+	ProofSetID      uint64 `json:"proof_set_id,omitempty"`
+	OperatorEmail   string `json:"operator_email,omitempty"`
+	CreatedAt       string `json:"created_at"`
+	ExpiresAt       string `json:"expires_at"`
+	NextStep        string `json:"next_step,omitempty"`
 }

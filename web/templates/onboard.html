@@ -40,14 +40,69 @@
                     id="did" 
                     name="did" 
                     class="form-input" 
-                    placeholder="did:key:z6Mk..."
+                    placeholder="did:key:..."
                     value="{{.FormData.DID}}"
                     required
                     pattern="did:.*"
                     title="DID must start with 'did:'"
                 >
                 <div class="form-help">
-                    Example: <code>did:key:z6MkjApdj1bAgFyvC9AyNEUxZ3hQKXMLLUmG6rEpkPbSypAv</code>
+                    Example: <code>did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e</code>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="filecoin_address" class="form-label">
+                    Filecoin Address *
+                </label>
+                <input 
+                    type="text" 
+                    id="filecoin_address" 
+                    name="filecoin_address" 
+                    class="form-input" 
+                    placeholder="f1..."
+                    value="{{.FormData.FilecoinAddress}}"
+                    required
+                >
+                <div class="form-help">
+                    Your Delegate Address (e.g., <code>0x7469B47e006D0660aB92AE560b27A1075EEcF97F</code>)
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="proof_set_id" class="form-label">
+                    Proof Set ID *
+                </label>
+                <input 
+                    type="number" 
+                    id="proof_set_id" 
+                    name="proof_set_id" 
+                    class="form-input" 
+                    placeholder="12345"
+                    value="{{.FormData.ProofSetID}}"
+                    required
+                    min="1"
+                >
+                <div class="form-help">
+                    Your Proof Set ID (a positive integer)
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="operator_email" class="form-label">
+                    Operator Email *
+                </label>
+                <input 
+                    type="email" 
+                    id="operator_email" 
+                    name="operator_email" 
+                    class="form-input" 
+                    placeholder="your.email@example.com"
+                    value="{{.FormData.OperatorEmail}}"
+                    required
+                >
+                <div class="form-help">
+                    Your contact email for operations-related communications
                 </div>
             </div>
             
@@ -90,13 +145,9 @@
         <div class="session-info">
             <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
             <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
-            {{if .Session.DelegationData}}
-            <p>
-                <a href="/onboard/delegation/{{.Session.SessionID}}" class="btn btn-link" download>
-                    📄 Download Delegation
-                </a>
-            </p>
-            {{end}}
+            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
+            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
+            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
         </div>
         {{end}}
         
@@ -124,7 +175,7 @@
             
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Verify FQDN</button>
-                <a href="/onboard" class="btn btn-secondary">Start Over</a>
+                <a href="/onboard/new" class="btn btn-secondary">Start Over</a>
             </div>
         </form>
     </div>
@@ -165,14 +216,10 @@
         <div class="session-info">
             <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
             <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
+            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
+            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
+            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
             <p><strong>FQDN:</strong> <code>{{.Session.FQDN}}</code></p>
-            {{if .Session.DelegationData}}
-            <p>
-                <a href="/onboard/delegation/{{.Session.SessionID}}" class="btn btn-link" download>
-                    📄 Download Delegation
-                </a>
-            </p>
-            {{end}}
         </div>
         {{end}}
         
@@ -199,7 +246,7 @@
             
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Submit Proof</button>
-                <a href="/onboard" class="btn btn-secondary">Start Over</a>
+                <a href="/onboard/new" class="btn btn-secondary">Start Over</a>
             </div>
         </form>
     </div>
@@ -237,6 +284,9 @@
             <h3>Registration Details</h3>
             <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
             <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
+            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
+            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
+            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
             <p><strong>FQDN:</strong> <code>{{.Session.FQDN}}</code></p>
             <p><strong>Status:</strong> <span class="status-completed">✅ {{.Session.Status}}</span></p>
             

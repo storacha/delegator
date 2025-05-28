@@ -28,9 +28,12 @@ type OnboardingTemplateData struct {
 
 // FormData represents form input data
 type FormData struct {
-	DID   string
-	URL   string
-	Proof string
+	DID             string
+	FilecoinAddress string
+	ProofSetID      uint64
+	OperatorEmail   string
+	URL             string
+	Proof           string
 }
 
 // OnboardingIndex shows the onboarding flow based on step or session
@@ -82,7 +85,7 @@ func (h *WebHandler) OnboardingIndex(c echo.Context) error {
 func (h *WebHandler) NewOnboardingSession(c echo.Context) error {
 	// Clear any existing session
 	h.clearSessionCookie(c)
-	
+
 	// Redirect to step 1 (DID registration)
 	return c.Redirect(http.StatusSeeOther, "/onboard")
 }
@@ -92,11 +95,25 @@ func (h *WebHandler) RegisterDID(c echo.Context) error {
 	fmt.Println("DEBUG RegisterDID: Handler called")
 
 	didStr := c.FormValue("did")
-	fmt.Printf("DEBUG RegisterDID: DID value: %s\n", didStr)
+	filecoinAddr := c.FormValue("filecoin_address")
+	proofSetIDStr := c.FormValue("proof_set_id")
+	operatorEmail := c.FormValue("operator_email")
+	
+	fmt.Printf("DEBUG RegisterDID: DID value: %s, Filecoin Address: %s, Proof Set ID: %s, Operator Email: %s\n", 
+		didStr, filecoinAddr, proofSetIDStr, operatorEmail)
 
 	// Check for existing session
 	existingSessionID := h.getSessionID(c)
 	fmt.Printf("DEBUG RegisterDID: Existing session ID: %s\n", existingSessionID)
+
+	// Parse proof set ID
+	var proofSetID uint64
+	if proofSetIDStr != "" {
+		parsedID, err := strconv.ParseUint(proofSetIDStr, 10, 64)
+		if err == nil {
+			proofSetID = parsedID
+		}
+	}
 
 	data := &OnboardingTemplateData{
 		TemplateData: &TemplateData{
@@ -104,7 +121,10 @@ func (h *WebHandler) RegisterDID(c echo.Context) error {
 		},
 		Step: 1,
 		FormData: &FormData{
-			DID: didStr,
+			DID:             didStr,
+			FilecoinAddress: filecoinAddr,
+			ProofSetID:      proofSetID,
+			OperatorEmail:   operatorEmail,
 		},
 		HelpTexts: h.getHelpTexts(),
 	}
@@ -112,6 +132,21 @@ func (h *WebHandler) RegisterDID(c echo.Context) error {
 	// Validate input
 	if didStr == "" {
 		data.Error = "DID is required"
+		return h.render(c, "onboard.html", data)
+	}
+
+	if filecoinAddr == "" {
+		data.Error = "Filecoin Address is required"
+		return h.render(c, "onboard.html", data)
+	}
+
+	if proofSetIDStr == "" || proofSetID == 0 {
+		data.Error = "Proof Set ID is required and must be greater than 0"
+		return h.render(c, "onboard.html", data)
+	}
+
+	if operatorEmail == "" {
+		data.Error = "Operator Email is required"
 		return h.render(c, "onboard.html", data)
 	}
 
@@ -130,8 +165,9 @@ func (h *WebHandler) RegisterDID(c echo.Context) error {
 	}
 
 	// Register DID
-	fmt.Printf("DEBUG RegisterDID: Calling service.RegisterDID with DID: %s\n", parsedDID.String())
-	resp, err := onboardingService.RegisterDID(parsedDID)
+	fmt.Printf("DEBUG RegisterDID: Calling service.RegisterDID with DID: %s, Filecoin Address: %s, Proof Set ID: %d, Operator Email: %s\n", 
+		parsedDID.String(), filecoinAddr, proofSetID, operatorEmail)
+	resp, err := onboardingService.RegisterDID(parsedDID, filecoinAddr, proofSetID, operatorEmail)
 	if err != nil {
 		fmt.Printf("DEBUG RegisterDID: Error from RegisterDID: %v\n", err)
 
@@ -160,8 +196,7 @@ func (h *WebHandler) RegisterDID(c echo.Context) error {
 	}
 
 	// Success - redirect to step 2 with session
-	// We still include the session_id in URL for backward compatibility
-	redirectURL := fmt.Sprintf("/onboard?session_id=%s&step=2", resp.SessionID)
+	redirectURL := "/onboard?step=2"
 	fmt.Printf("DEBUG RegisterDID: Redirecting to: %s\n", redirectURL)
 	return c.Redirect(http.StatusSeeOther, redirectURL)
 }
@@ -255,7 +290,7 @@ func (h *WebHandler) RegisterFQDN(c echo.Context) error {
 				if err2 == nil {
 					// Success with form session ID
 					h.setSessionCookie(c, resp2.SessionID)
-					return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/onboard?session_id=%s&step=3", resp2.SessionID))
+					return c.Redirect(http.StatusSeeOther, "/onboard?step=3")
 				}
 				fmt.Printf("DEBUG RegisterFQDN: Retry also failed: %v\n", err2)
 			}
@@ -274,7 +309,7 @@ func (h *WebHandler) RegisterFQDN(c echo.Context) error {
 	h.setSessionCookie(c, resp.SessionID)
 
 	// Success - redirect to step 3
-	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/onboard?session_id=%s&step=3", resp.SessionID))
+	return c.Redirect(http.StatusSeeOther, "/onboard?step=3")
 }
 
 // RegisterProof handles proof registration form submission
@@ -344,7 +379,7 @@ func (h *WebHandler) RegisterProof(c echo.Context) error {
 	h.setSessionCookie(c, resp.SessionID)
 
 	// Success - redirect to completion page
-	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/onboard?session_id=%s&step=4", resp.SessionID))
+	return c.Redirect(http.StatusSeeOther, "/onboard?step=4")
 }
 
 // SessionStatus shows the status of an onboarding session

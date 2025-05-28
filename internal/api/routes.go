@@ -53,8 +53,9 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, store storage.Store) error
 			e.POST("/onboard/register-did", webHandler.RegisterDID)
 			e.POST("/onboard/register-fqdn", webHandler.RegisterFQDN)
 			e.POST("/onboard/register-proof", webHandler.RegisterProof)
+			// Use path param only for session ID since we've removed query param support
 			e.GET("/onboard/status/:session_id", webHandler.SessionStatus)
-			e.GET("/onboard/status", webHandler.SessionStatus) // For query param version
+			e.GET("/onboard/status", webHandler.SessionStatus) // Will use cookie
 			e.GET("/onboard/delegation/:session_id", webHandler.GetDelegation)
 		} else {
 			// Web handler failed, provide basic root route

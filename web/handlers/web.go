@@ -157,22 +157,21 @@ func (h *WebHandler) render(c echo.Context, templateName string, data interface{
 	return c.Render(http.StatusOK, templateName, data)
 }
 
-// getSessionID gets the session ID from cookie first, then falls back to URL parameter
+// getSessionID gets the session ID from cookie only
 func (h *WebHandler) getSessionID(c echo.Context) string {
-	// Try to get session ID from cookie first
+	// Get session ID from cookie
 	sess, err := session.Get("delegator_session", c)
 	if err != nil {
-	} else {
-		if sess.Values["session_id"] != nil {
-			if sessionID, ok := sess.Values["session_id"].(string); ok && sessionID != "" {
-				return sessionID
-			}
+		return ""
+	}
+
+	if sess.Values["session_id"] != nil {
+		if sessionID, ok := sess.Values["session_id"].(string); ok && sessionID != "" {
+			return sessionID
 		}
 	}
 
-	// Fall back to URL parameter
-	sessionID := c.QueryParam("session_id")
-	return sessionID
+	return ""
 }
 
 // setSessionCookie saves the session ID to a cookie

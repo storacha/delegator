@@ -267,57 +267,28 @@
     `;
     document.head.appendChild(style);
     
-    // Session management with localStorage backup
+    // Session management using cookies with localStorage as fallback
     function initSessionManagement() {
         console.log('Initializing session management');
         
-        // Check if we have a session ID in URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionId = urlParams.get('session_id');
-        
         // Log the current state for debugging
-        console.log('URL session ID:', sessionId);
         console.log('Local storage session ID:', localStorage.getItem('delegator_session_id'));
         console.log('Cookies:', document.cookie);
         
-        // Priority 1: Use URL parameter if available
-        if (sessionId) {
-            console.log('Found session ID in URL, saving to localStorage:', sessionId);
-            // Save session ID to localStorage as backup
-            localStorage.setItem('delegator_session_id', sessionId);
+        // Try to get session ID from localStorage as fallback
+        const savedSessionId = localStorage.getItem('delegator_session_id');
+        if (savedSessionId) {
+            console.log('Found session ID in localStorage:', savedSessionId);
             
-            // Also try to set the input fields with this value
+            // Update form inputs with session ID from localStorage
             document.querySelectorAll('input[name="session_id"]').forEach(input => {
-                input.value = sessionId;
-                console.log('Updated form input with session ID:', sessionId);
-            });
-        } 
-        // Priority 2: Try to use localStorage if URL doesn't have it
-        else {
-            // Check if we can recover session ID from localStorage
-            const savedSessionId = localStorage.getItem('delegator_session_id');
-            if (savedSessionId) {
-                console.log('Using saved session ID from localStorage:', savedSessionId);
-                
-                // Update form inputs immediately
-                document.querySelectorAll('input[name="session_id"]').forEach(input => {
-                    if (!input.value) {
-                        input.value = savedSessionId;
-                        console.log('Updated form input with saved session ID:', savedSessionId);
-                    }
-                });
-                
-                // If we're on a page that needs session context but doesn't have it in URL, add it
-                if (!document.cookie.includes('delegator_session') && 
-                   (window.location.pathname === '/' || 
-                    window.location.pathname === '/onboard' ||
-                    window.location.pathname === '/onboard/status')) {
-                    console.log('Redirecting to add session ID to URL');
-                    const separator = window.location.search ? '&' : '?';
-                    window.location.href = window.location.href + separator + 'session_id=' + savedSessionId;
+                if (!input.value) {
+                    input.value = savedSessionId;
+                    console.log('Updated form input with saved session ID:', savedSessionId);
                 }
-            }
+            });
         }
+    }
         
         // Add special handler for FQDN form submission 
         const fqdnForm = document.getElementById('fqdn-form');
@@ -349,31 +320,7 @@
             });
         }
         
-        // Enhance all links to maintain session context
-        const links = document.querySelectorAll('a[href^="/"]');
-        links.forEach(function(link) {
-            // Don't modify already modified links or download links
-            if (link.href.includes('session_id=') || link.hasAttribute('download')) {
-                return;
-            }
-            
-            // Don't modify links to static resources
-            if (link.href.includes('/static/')) {
-                return;
-            }
-            
-            link.addEventListener('click', function(e) {
-                const savedSessionId = localStorage.getItem('delegator_session_id');
-                if (savedSessionId) {
-                    const url = new URL(link.href);
-                    // Only add session ID if not already present
-                    if (!url.searchParams.has('session_id')) {
-                        url.searchParams.append('session_id', savedSessionId);
-                        link.href = url.toString();
-                    }
-                }
-            });
-        });
+        // No need to modify links anymore as we're using cookies
         
         // Enhance forms to include session ID from localStorage if not already present or empty
         const forms = document.querySelectorAll('form');

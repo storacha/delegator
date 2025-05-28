@@ -11,11 +11,17 @@ import (
 // Config holds all configuration for the application
 type Config struct {
 	Server     ServerConfig     `mapstructure:"server"`
-	Database   DatabaseConfig   `mapstructure:"database"`
-	AWS        AWSConfig        `mapstructure:"aws"`
-	Log        LogConfig        `mapstructure:"log"`
 	Onboarding OnboardingConfig `mapstructure:"onboarding"`
-	DynamoDB   DynamoDBConfig   `mapstructure:"dynamodb"`
+	Log        LogConfig        `mapstructure:"log"`
+}
+
+// ServerConfig holds server-specific configuration
+type ServerConfig struct {
+	Host         string        `mapstructure:"host"`
+	Port         int           `mapstructure:"port"`
+	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout time.Duration `mapstructure:"write_timeout"`
+	SessionKey   string        `mapstructure:"session_key"`
 }
 
 // OnboardingConfig holds onboarding-specific configuration
@@ -30,42 +36,9 @@ type OnboardingConfig struct {
 	ServiceName             string        `mapstructure:"service_name"`
 }
 
-// DynamoDBConfig holds DynamoDB table configuration
-type DynamoDBConfig struct {
-	AllowlistTable    string `mapstructure:"allowlist_table"`
-	SessionsTable     string `mapstructure:"sessions_table"`
-	ProvidersTable    string `mapstructure:"providers_table"`
-	ProviderInfoTable string `mapstructure:"provider_info_table"`
-}
-
-// ServerConfig holds server-specific configuration
-type ServerConfig struct {
-	Host         string        `mapstructure:"host"`
-	Port         int           `mapstructure:"port"`
-	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout time.Duration `mapstructure:"write_timeout"`
-	SessionKey   string        `mapstructure:"session_key"`
-}
-
-// DatabaseConfig holds database configuration
-type DatabaseConfig struct {
-	Region    string `mapstructure:"region"`
-	TableName string `mapstructure:"table_name"`
-	Endpoint  string `mapstructure:"endpoint"`
-}
-
-// AWSConfig holds AWS-specific configuration
-type AWSConfig struct {
-	Region          string `mapstructure:"region"`
-	AccessKeyID     string `mapstructure:"access_key_id"`
-	SecretAccessKey string `mapstructure:"secret_access_key"`
-	SessionToken    string `mapstructure:"session_token"`
-}
-
 // LogConfig holds logging configuration
 type LogConfig struct {
-	Level  string `mapstructure:"level"`
-	Format string `mapstructure:"format"`
+	Level string `mapstructure:"level"`
 }
 
 // New creates a new viper instance with proper defaults and search paths
@@ -120,16 +93,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.write_timeout", 30)
 	v.SetDefault("server.session_key", "storacha-delegator-secret-key")
 
-	// Database defaults
-	v.SetDefault("database.region", "us-west-2")
-	v.SetDefault("database.table_name", "providers")
-
-	// AWS defaults
-	v.SetDefault("aws.region", "us-west-2")
-
 	// Log defaults
 	v.SetDefault("log.level", "info")
-	v.SetDefault("log.format", "json")
 
 	// Onboarding defaults
 	v.SetDefault("onboarding.session_timeout", 3600)
@@ -138,13 +103,6 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("onboarding.max_retries", 3)
 	v.SetDefault("onboarding.allowed_dids", []string{})
 	v.SetDefault("onboarding.service_name", "Storacha")
-	v.SetDefault("onboarding.help_text_settings", map[string]string{})
-
-	// DynamoDB defaults
-	v.SetDefault("dynamodb.allowlist_table", "allowed-dids")
-	v.SetDefault("dynamodb.sessions_table", "onboarding-sessions")
-	v.SetDefault("dynamodb.providers_table", "staging-warm-w3infra-storage-provider")
-	v.SetDefault("dynamodb.provider_info_table", "staging-warm-w3infra-storage-provider-info")
 }
 
 func validate(config *Config) error {

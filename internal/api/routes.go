@@ -49,6 +49,7 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, store storage.Store) error
 			// Web UI routes (HTML pages)
 			e.GET("/", webHandler.Home)
 			e.GET("/onboard", webHandler.OnboardingIndex)
+			e.GET("/onboard/new", webHandler.NewOnboardingSession)
 			e.POST("/onboard/register-did", webHandler.RegisterDID)
 			e.POST("/onboard/register-fqdn", webHandler.RegisterFQDN)
 			e.POST("/onboard/register-proof", webHandler.RegisterProof)

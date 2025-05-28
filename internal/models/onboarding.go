@@ -73,22 +73,19 @@ type ProofRegisterRequest struct {
 type DIDVerifyResponse struct {
 	SessionID     string `json:"session_id"`
 	DelegationURL string `json:"delegation_url"`
-	Instructions  string `json:"instructions"`
 }
 
 // FQDNVerifyResponse represents the response for FQDN verification
 type FQDNVerifyResponse struct {
-	SessionID    string `json:"session_id"`
-	Status       string `json:"status"`
-	FQDN         string `json:"fqdn"`
-	Instructions string `json:"instructions"`
+	SessionID string `json:"session_id"`
+	Status    string `json:"status"`
+	FQDN      string `json:"fqdn"`
 }
 
 // ProofVerifyResponse represents the response for proof verification
 type ProofVerifyResponse struct {
-	SessionID    string `json:"session_id"`
-	Status       string `json:"status"`
-	Instructions string `json:"instructions"`
+	SessionID string `json:"session_id"`
+	Status    string `json:"status"`
 }
 
 // OnboardingStatusResponse represents the status of an onboarding session

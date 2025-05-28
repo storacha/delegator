@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	logging "github.com/ipfs/go-log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -67,6 +68,16 @@ func initConfig() error {
 	cfg, err = config.Load(v)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	if cfg.Log.Level != "" {
+		lvl, err := logging.LevelFromString(cfg.Log.Level)
+		if err != nil {
+			return fmt.Errorf("invalid log level (%s): %w", cfg.Log.Level, err)
+		}
+		logging.SetAllLoggers(lvl)
+	} else {
+		logging.SetAllLoggers(logging.LevelInfo)
 	}
 
 	return nil

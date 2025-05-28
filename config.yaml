@@ -6,17 +6,6 @@ server:
   read_timeout: 30
   write_timeout: 30
 
-database:
-  region: us-west-2
-  table_name: providers
-  # endpoint: http://localhost:8000  # For local DynamoDB
-
-aws:
-  region: us-west-2
-  # access_key_id: your-key-id
-  # secret_access_key: your-secret-key
-  # session_token: your-session-token
-
 log:
   level: info
   format: console
@@ -37,8 +26,3 @@ onboarding:
     node_config_options: "--auto-respond --timeout 30"
     did_flags: "--output-key --output-format=jwk"
 
-dynamodb:
-  allowlist_table: "allowed-dids"
-  sessions_table: "onboarding-sessions"
-  providers_table: "staging-warm-w3infra-storage-provider"
-  provider_info_table: "staging-warm-w3infra-storage-provider-info"

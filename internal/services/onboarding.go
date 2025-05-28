@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	logging "github.com/ipfs/go-log"
 	"github.com/storacha/go-libstoracha/capabilities/blob"
 	"github.com/storacha/go-libstoracha/capabilities/blob/replica"
 	"github.com/storacha/go-libstoracha/capabilities/pdp"
@@ -25,6 +26,8 @@ import (
 	"github.com/storacha/delegator/internal/models"
 	"github.com/storacha/delegator/internal/storage"
 )
+
+var log = logging.Logger("service/onboarding")
 
 // OnboardingService handles WSP onboarding logic
 type OnboardingService struct {
@@ -78,7 +81,6 @@ func (s *OnboardingService) RegisterDID(strgDID did.DID) (*models.DIDVerifyRespo
 			return &models.DIDVerifyResponse{
 				SessionID:     existingSession.SessionID,
 				DelegationURL: fmt.Sprintf("/api/v1/onboard/delegation/%s", existingSession.SessionID),
-				Instructions:  s.getDelegationInstructions(),
 			}, nil
 		}
 	}
@@ -110,7 +112,6 @@ func (s *OnboardingService) RegisterDID(strgDID did.DID) (*models.DIDVerifyRespo
 	return &models.DIDVerifyResponse{
 		SessionID:     sessionID,
 		DelegationURL: fmt.Sprintf("/api/v1/onboard/delegation/%s", sessionID),
-		Instructions:  s.getDelegationInstructions(),
 	}, nil
 }
 
@@ -205,10 +206,9 @@ func (s *OnboardingService) RegisterFQDN(sessionID string, fqdnURL url.URL) (*mo
 	}
 
 	return &models.FQDNVerifyResponse{
-		SessionID:    sessionID,
-		Status:       models.StatusFQDNVerified,
-		FQDN:         fqdnURL.String(),
-		Instructions: s.getUploadDelegationInstructions(),
+		SessionID: sessionID,
+		Status:    models.StatusFQDNVerified,
+		FQDN:      fqdnURL.String(),
 	}, nil
 }
 
@@ -274,9 +274,8 @@ func (s *OnboardingService) RegisterProof(sessionID string, proof string) (*mode
 	}
 
 	return &models.ProofVerifyResponse{
-		SessionID:    sessionID,
-		Status:       models.StatusProofVerified,
-		Instructions: s.getCompletionInstructions(),
+		SessionID: sessionID,
+		Status:    models.StatusProofVerified,
 	}, nil
 }
 
@@ -358,22 +357,6 @@ func (s *OnboardingService) verifyFQDNReturnsCorrectDID(fqdnURL url.URL, expecte
 	return nil
 }
 
-// getUploadDelegationInstructions returns instructions for generating upload delegation
-func (s *OnboardingService) getUploadDelegationInstructions() string {
-	return `FQDN verification successful! Next steps:
-
-1. Generate a delegation on your storage node that allows the upload service to issue delegations for storing data
-2. The delegation should grant the following capabilities to did:key:z6MkffDZCkCTWreg8868fG1FGFogcJj5X6PY93pPcWDn9bob:
-   - store/add
-   - upload/add
-   - filecoin/offer
-   - piece/offer
-3. Submit the delegation/proof in the next step to complete onboarding
-4. Once submitted, you'll be added to the provider registry and can begin receiving deals
-
-For detailed instructions on generating delegations, please refer to the documentation.`
-}
-
 // generateDelegation generates a delegation for the provider (stubbed)
 func (s *OnboardingService) generateDelegation(strgDID ucan.Principal) (string, error) {
 	indxToStrgDelegation, err := delegation.DelegateIndexingToStorage(s.indexingService, strgDID)
@@ -386,21 +369,6 @@ func (s *OnboardingService) generateDelegation(strgDID ucan.Principal) (string, 
 	}
 
 	return delegation.FormatDelegation(isb)
-}
-
-// getDelegationInstructions returns instructions for configuring the Piri node
-func (s *OnboardingService) getDelegationInstructions() string {
-	// TODO: these are wrong, and should link to a doc on a website so we may update the docs content
-	// independently of this binary
-	return `Please follow these steps to configure your Piri node:
-
-1. Download the delegation file from the provided URL
-2. Save it as 'delegation.json' in your Piri node configuration directory
-3. Update your Piri node configuration to use the delegation:
-   - Set DELEGATION_FILE=/path/to/delegation.b64
-4. Restart your Piri node with the new configuration
-5. Verify your node is running and accessible at your FQDN
-6. Proceed to the next step: FQDN verification`
 }
 
 // validateProof validates the proof delegation
@@ -464,21 +432,6 @@ func (s *OnboardingService) storeProvider(session *models.OnboardingSession) err
 	}
 
 	return nil
-}
-
-// getCompletionInstructions returns instructions for completed onboarding
-func (s *OnboardingService) getCompletionInstructions() string {
-	return `Congratulations! Your WSP onboarding is complete.
-
-Your storage provider has been successfully registered and added to the provider registry.
-
-What happens next:
-1. Your node will begin receiving warm storage deals from the network
-2. You can monitor your provider status through the delegator API
-3. Ensure your storage node remains online and accessible at your registered FQDN
-4. Monitor your Filecoin address for PDP Smart Contract interactions
-
-For support and documentation, please refer to the WSP operator documentation.`
 }
 
 // getNextStep determines the next step based on current status

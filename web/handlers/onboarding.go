@@ -78,6 +78,15 @@ func (h *WebHandler) OnboardingIndex(c echo.Context) error {
 	return h.render(c, "onboard.html", data)
 }
 
+// NewOnboardingSession clears any existing session and starts a new onboarding flow
+func (h *WebHandler) NewOnboardingSession(c echo.Context) error {
+	// Clear any existing session
+	h.clearSessionCookie(c)
+	
+	// Redirect to step 1 (DID registration)
+	return c.Redirect(http.StatusSeeOther, "/onboard")
+}
+
 // RegisterDID handles DID registration form submission
 func (h *WebHandler) RegisterDID(c echo.Context) error {
 	fmt.Println("DEBUG RegisterDID: Handler called")

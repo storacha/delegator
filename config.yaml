@@ -1,0 +1,38 @@
+# Delegator Service Configuration
+
+server:
+  host: localhost
+  port: 8080
+  read_timeout: 30
+  write_timeout: 30
+
+database:
+  region: us-west-2
+  table_name: providers
+  # endpoint: http://localhost:8000  # For local DynamoDB
+
+aws:
+  region: us-west-2
+  # access_key_id: your-key-id
+  # secret_access_key: your-secret-key
+  # session_token: your-session-token
+
+log:
+  level: info
+  format: console
+
+onboarding:
+  session_timeout: 3600  # 1 hour in seconds
+  delegation_ttl: 86400  # 24 hours in seconds
+  fqdn_verification_timeout: 30  # 30 seconds
+  max_retries: 3
+  indexing_service_key: "MgCa5lObwi7YoN08khh0sVmK0cqv9wR9bUeJLz3osyYem3+0Bh5Ank+zu2EIeJ/Tpy2gdxMRmIJSBGIEl6FtMAsJwZzE="
+  upload_service_key: "MgCbeqcVqMcLs/4a7nKvHwcQLAggz+gZNDFykd9mXINLtY+0Buvk0hCp2CxihinQmNocYu+Q495YWgafn582g3UOJ93A="
+  allowed_dids:
+    - "did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"
+
+dynamodb:
+  allowlist_table: "allowed-dids"
+  sessions_table: "onboarding-sessions"
+  providers_table: "staging-warm-w3infra-storage-provider"
+  provider_info_table: "staging-warm-w3infra-storage-provider-info"

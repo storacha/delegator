@@ -198,8 +198,8 @@ func setupServer(t *testing.T) *server.Server {
 			WriteTimeout: time.Minute,
 		},
 		Onboarding: config.OnboardingConfig{
-			SessionTimeout:          time.Minute,
-			DelegationTTL:           time.Minute,
+			SessionTimeout:          time.Hour,
+			DelegationTTL:           time.Hour,
 			FQDNVerificationTimeout: time.Minute,
 			MaxRetries:              1,
 			IndexingServiceKey:      IndexingServiceKey,

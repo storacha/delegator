@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/gorilla/sessions"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
@@ -55,9 +58,25 @@ func New(cfg *config.Config, opts ...Option) (*Server, error) {
 	e.Use(middleware.CORS())
 	e.Use(middleware.RequestID())
 
-	// Configure server timeouts
-	e.Server.ReadTimeout = cfg.Server.ReadTimeout
-	e.Server.WriteTimeout = cfg.Server.WriteTimeout
+	// Configure session middleware with proper settings
+	cookieStore := sessions.NewCookieStore([]byte(cfg.Server.SessionKey))
+	cookieStore.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7, // 1 week
+		HttpOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: http.SameSiteLaxMode,
+	}
+	e.Use(session.Middleware(cookieStore))
+	
+	// Print debug message about session configuration
+	fmt.Printf("DEBUG server: Session middleware configured with key length: %d\n", len(cfg.Server.SessionKey))
+
+	// Configure server timeouts - convert seconds to proper time.Duration
+	e.Server.ReadTimeout = cfg.Server.ReadTimeout * time.Second
+	e.Server.ReadHeaderTimeout = cfg.Server.ReadTimeout * time.Second
+	e.Server.IdleTimeout = cfg.Server.ReadTimeout * time.Second
+	e.Server.WriteTimeout = cfg.Server.WriteTimeout * time.Second
 
 	// Initialize API routes
 	if err := api.RegisterRoutes(e, cfg, options.store); err != nil {

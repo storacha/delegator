@@ -43,6 +43,7 @@ type ServerConfig struct {
 	Port         int           `mapstructure:"port"`
 	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
 	WriteTimeout time.Duration `mapstructure:"write_timeout"`
+	SessionKey   string        `mapstructure:"session_key"`
 }
 
 // DatabaseConfig holds database configuration
@@ -116,6 +117,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.port", 8080)
 	v.SetDefault("server.read_timeout", 30)
 	v.SetDefault("server.write_timeout", 30)
+	v.SetDefault("server.session_key", "storacha-delegator-secret-key")
 
 	// Database defaults
 	v.SetDefault("database.region", "us-west-2")

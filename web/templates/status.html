@@ -1,0 +1,190 @@
+{{define "content"}}
+<div class="status-header">
+    <h1>Onboarding Session Status</h1>
+    {{if .Session}}
+    <p class="session-id">Session ID: <code>{{.Session.SessionID}}</code></p>
+    {{end}}
+</div>
+
+{{if .Session}}
+<div class="status-content">
+    <div class="status-overview">
+        <div class="status-card">
+            <h2>Current Status</h2>
+            <div class="status-badge status-{{.Session.Status}}">
+                {{if eq .Session.Status "did_verified"}}🔐 DID Verified{{end}}
+                {{if eq .Session.Status "fqdn_verified"}}🌐 FQDN Verified{{end}}
+                {{if eq .Session.Status "proof_verified"}}✅ Proof Verified{{end}}
+                {{if eq .Session.Status "completed"}}🎉 Completed{{end}}
+                {{if eq .Session.Status "expired"}}⏰ Expired{{end}}
+            </div>
+            
+            <div class="status-details">
+                <div class="detail-item">
+                    <span class="detail-label">DID:</span>
+                    <span class="detail-value"><code>{{.Session.DID}}</code></span>
+                </div>
+                
+                {{if .Session.FQDN}}
+                <div class="detail-item">
+                    <span class="detail-label">FQDN:</span>
+                    <span class="detail-value"><code>{{.Session.FQDN}}</code></span>
+                </div>
+                {{end}}
+                
+                <div class="detail-item">
+                    <span class="detail-label">Created:</span>
+                    <span class="detail-value">{{.Session.CreatedAt.Format "2006-01-02 15:04:05 UTC"}}</span>
+                </div>
+                
+                <div class="detail-item">
+                    <span class="detail-label">Expires:</span>
+                    <span class="detail-value">{{.Session.ExpiresAt.Format "2006-01-02 15:04:05 UTC"}}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="progress-card">
+            <h2>Progress</h2>
+            <div class="progress-steps">
+                <div class="progress-step {{if or (eq .Session.Status "did_verified") (eq .Session.Status "fqdn_verified") (eq .Session.Status "proof_verified") (eq .Session.Status "completed")}}completed{{else}}pending{{end}}">
+                    <span class="step-icon">{{if or (eq .Session.Status "did_verified") (eq .Session.Status "fqdn_verified") (eq .Session.Status "proof_verified") (eq .Session.Status "completed")}}✅{{else}}🔐{{end}}</span>
+                    <span class="step-text">DID Registration</span>
+                </div>
+                
+                <div class="progress-step {{if or (eq .Session.Status "fqdn_verified") (eq .Session.Status "proof_verified") (eq .Session.Status "completed")}}completed{{else if eq .Session.Status "did_verified"}}current{{else}}pending{{end}}">
+                    <span class="step-icon">{{if or (eq .Session.Status "fqdn_verified") (eq .Session.Status "proof_verified") (eq .Session.Status "completed")}}✅{{else if eq .Session.Status "did_verified"}}🌐{{else}}⏳{{end}}</span>
+                    <span class="step-text">FQDN Verification</span>
+                </div>
+                
+                <div class="progress-step {{if or (eq .Session.Status "proof_verified") (eq .Session.Status "completed")}}completed{{else if eq .Session.Status "fqdn_verified"}}current{{else}}pending{{end}}">
+                    <span class="step-icon">{{if or (eq .Session.Status "proof_verified") (eq .Session.Status "completed")}}✅{{else if eq .Session.Status "fqdn_verified"}}📝{{else}}⏳{{end}}</span>
+                    <span class="step-text">Proof Submission</span>
+                </div>
+                
+                <div class="progress-step {{if eq .Session.Status "completed"}}completed{{else}}pending{{end}}">
+                    <span class="step-icon">{{if eq .Session.Status "completed"}}🎉{{else}}⏳{{end}}</span>
+                    <span class="step-text">Complete</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {{if .NextStep}}
+    <div class="next-step-card">
+        <h2>Next Step</h2>
+        <div class="next-step-content">
+            {{if eq .NextStep "register-fqdn"}}
+            <p>Your DID has been verified. Next, you need to register and verify your FQDN.</p>
+            <a href="/onboard?session_id={{.Session.SessionID}}&step=2" class="btn btn-primary">Continue to FQDN Verification</a>
+            {{else if eq .NextStep "register-proof"}}
+            <p>Your FQDN has been verified. Next, submit your delegation proof to complete onboarding.</p>
+            <a href="/onboard?session_id={{.Session.SessionID}}&step=3" class="btn btn-primary">Continue to Proof Submission</a>
+            {{else if eq .Session.Status "completed"}}
+            <p>🎉 Your onboarding is complete! Your WSP is now registered with the Storacha network.</p>
+            <a href="/" class="btn btn-primary">Return to Dashboard</a>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+    
+    {{if .Session.DelegationData}}
+    <div class="delegation-card">
+        <h2>Delegation</h2>
+        <p>Your delegation is ready for download:</p>
+        <div class="delegation-actions">
+            <a href="/onboard/delegation/{{.Session.SessionID}}" class="btn btn-primary" download>
+                📄 Download Delegation File
+            </a>
+            <button type="button" class="btn btn-secondary" onclick="copyDelegationUrl()">
+                📋 Copy Download Link
+            </button>
+        </div>
+        <div class="delegation-info">
+            <p><small>Keep this delegation file secure. You may need it for future operations.</small></p>
+        </div>
+    </div>
+    {{end}}
+    
+    <div class="session-actions">
+        <h2>Actions</h2>
+        <div class="action-buttons">
+            {{if not (eq .Session.Status "completed")}}
+            <a href="/onboard?session_id={{.Session.SessionID}}" class="btn btn-primary">Continue Onboarding</a>
+            {{end}}
+            <button type="button" class="btn btn-secondary" onclick="refreshStatus()">🔄 Refresh Status</button>
+            <a href="/" class="btn btn-secondary">Return to Dashboard</a>
+        </div>
+    </div>
+</div>
+{{else}}
+<div class="status-not-found">
+    <div class="error-content">
+        <h2>Session Not Found</h2>
+        <p>The session you're looking for doesn't exist or has expired.</p>
+        
+        <div class="search-form">
+            <h3>Search for a Session</h3>
+            <form action="/onboard/status" method="get">
+                <div class="form-group">
+                    <label for="session_id" class="form-label">Session ID:</label>
+                    <div class="input-group">
+                        <input 
+                            type="text" 
+                            id="session_id" 
+                            name="session_id" 
+                            class="form-input"
+                            placeholder="Enter session ID"
+                            value="{{.RequestedSessionID}}"
+                            required
+                        >
+                        <button type="submit" class="btn btn-primary">Search</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <div class="help-actions">
+            <a href="/onboard" class="btn btn-primary">Start New Onboarding</a>
+            <a href="/" class="btn btn-secondary">Return to Dashboard</a>
+        </div>
+    </div>
+</div>
+{{end}}
+{{end}}
+
+{{define "scripts"}}
+<script>
+function refreshStatus() {
+    window.location.reload();
+}
+
+function copyDelegationUrl() {
+    const url = window.location.origin + '/onboard/delegation/{{if .Session}}{{.Session.SessionID}}{{end}}';
+    navigator.clipboard.writeText(url).then(() => {
+        // Simple feedback - could be enhanced with a toast notification
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    });
+}
+</script>
+{{end}}

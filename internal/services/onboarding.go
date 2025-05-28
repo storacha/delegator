@@ -16,10 +16,12 @@ import (
 	"github.com/storacha/go-libstoracha/capabilities/blob/replica"
 	"github.com/storacha/go-libstoracha/capabilities/pdp"
 	"github.com/storacha/go-ucanto/did"
+	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/ucan"
 
 	"github.com/storacha/go-mkdelegation/pkg/delegation"
 
+	"github.com/storacha/delegator/internal/config"
 	"github.com/storacha/delegator/internal/models"
 	"github.com/storacha/delegator/internal/storage"
 )
@@ -147,19 +149,43 @@ func (s *OnboardingService) GetDelegation(sessionID string) (string, error) {
 
 // RegisterFQDN performs Step 3.3: FQDN verification and readiness check
 func (s *OnboardingService) RegisterFQDN(sessionID string, fqdnURL url.URL) (*models.FQDNVerifyResponse, error) {
+	// Debug log
+	fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Called with sessionID=%s, URL=%s\n",
+		sessionID, fqdnURL.String())
+
 	// Get the session
 	session, err := s.store.GetSession(sessionID)
 	if err != nil {
-		return nil, ErrSessionNotFound
+		fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Session not found: %v\n", err)
+
+		// Try one more time with a trimmed session ID (in case there are whitespace issues)
+		trimmedID := strings.TrimSpace(sessionID)
+		if trimmedID != sessionID {
+			fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Trying with trimmed session ID: '%s'\n", trimmedID)
+			session, err = s.store.GetSession(trimmedID)
+			if err == nil {
+				sessionID = trimmedID
+				fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Found session with trimmed ID\n")
+			}
+		}
+
+		if err != nil {
+			return nil, ErrSessionNotFound
+		}
 	}
+
+	fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Found session: %+v\n", *session)
 
 	// Check if session has expired
 	if time.Now().After(session.ExpiresAt) {
+		fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Session expired at %s\n",
+			session.ExpiresAt.Format(time.RFC3339))
 		return nil, fmt.Errorf("%w: session expired", ErrInvalidSessionState)
 	}
 
 	// Check if session is in the correct state (should be DID verified)
 	if session.Status != models.StatusDIDVerified {
+		fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Wrong session state: %s\n", session.Status)
 		return nil, fmt.Errorf("%w: expected status '%s', got '%s'",
 			ErrInvalidSessionState, models.StatusDIDVerified, session.Status)
 	}
@@ -188,19 +214,42 @@ func (s *OnboardingService) RegisterFQDN(sessionID string, fqdnURL url.URL) (*mo
 
 // RegisterProof performs Step 3.4: Proof verification and provider registration
 func (s *OnboardingService) RegisterProof(sessionID string, proof string) (*models.ProofVerifyResponse, error) {
+	// Debug log
+	fmt.Printf("DEBUG OnboardingService.RegisterProof: Called with sessionID=%s\n", sessionID)
+
 	// Get the session
 	session, err := s.store.GetSession(sessionID)
 	if err != nil {
-		return nil, ErrSessionNotFound
+		fmt.Printf("DEBUG OnboardingService.RegisterProof: Session not found: %v\n", err)
+
+		// Try one more time with a trimmed session ID (in case there are whitespace issues)
+		trimmedID := strings.TrimSpace(sessionID)
+		if trimmedID != sessionID {
+			fmt.Printf("DEBUG OnboardingService.RegisterProof: Trying with trimmed session ID: '%s'\n", trimmedID)
+			session, err = s.store.GetSession(trimmedID)
+			if err == nil {
+				sessionID = trimmedID
+				fmt.Printf("DEBUG OnboardingService.RegisterProof: Found session with trimmed ID\n")
+			}
+		}
+
+		if err != nil {
+			return nil, ErrSessionNotFound
+		}
 	}
+
+	fmt.Printf("DEBUG OnboardingService.RegisterProof: Found session: %+v\n", *session)
 
 	// Check if session has expired
 	if time.Now().After(session.ExpiresAt) {
+		fmt.Printf("DEBUG OnboardingService.RegisterProof: Session expired at %s\n",
+			session.ExpiresAt.Format(time.RFC3339))
 		return nil, fmt.Errorf("%w: session expired", ErrInvalidSessionState)
 	}
 
 	// Check if session is in the correct state (should be FQDN verified)
 	if session.Status != models.StatusFQDNVerified {
+		fmt.Printf("DEBUG OnboardingService.RegisterProof: Wrong session state: %s\n", session.Status)
 		return nil, fmt.Errorf("%w: expected status '%s', got '%s'",
 			ErrInvalidSessionState, models.StatusFQDNVerified, session.Status)
 	}
@@ -362,7 +411,7 @@ func (s *OnboardingService) validateProof(proof string, providerDID string) erro
 
 	strgDelegation, err := delegation.ParseDelegationContent(proof)
 	if err != nil {
-		return fmt.Errorf("parsing delegation content: %w", err)
+		return err
 	}
 
 	if strgDelegation.Expiration != 0 && strgDelegation.Expiration <= int(time.Now().Unix()) {
@@ -448,4 +497,21 @@ func (s *OnboardingService) getNextStep(status string) string {
 	default:
 		return "unknown"
 	}
+}
+
+// NewOnboardingServiceFromConfig creates a new onboarding service from config
+func NewOnboardingServiceFromConfig(store storage.Store, cfg config.OnboardingConfig) (*OnboardingService, error) {
+	sessionTimeout := time.Duration(cfg.SessionTimeout) * time.Second
+	delegationTTL := time.Duration(cfg.DelegationTTL) * time.Second
+
+	indexingService, err := ed25519.Parse(cfg.IndexingServiceKey)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing configured indexing service: %w", err)
+	}
+	uploadService, err := ed25519.Parse(cfg.UploadServiceKey)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing configured upload service: %w", err)
+	}
+
+	return NewOnboardingService(store, sessionTimeout, delegationTTL, indexingService, uploadService), nil
 }

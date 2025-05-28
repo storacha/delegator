@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Storacha Delegator</title>
+    <meta name="description" content="Warm Storage Provider onboarding for the Storacha network">
+    <link rel="stylesheet" href="/static/css/style.css">
+    {{block "head" .}}{{end}}
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">
+                <a href="/" aria-label="Storacha Delegator Home">🔥 Storacha Delegator</a>
+            </h1>
+            <nav class="nav" role="navigation">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/onboard{{if .SessionID}}?session_id={{.SessionID}}{{end}}" class="nav-link">Onboard</a>
+                <a href="/health" class="nav-link">Status</a>
+                {{if .SessionID}}<a href="/onboard/status/{{.SessionID}}" class="nav-link">My Session</a>{{end}}
+            </nav>
+        </div>
+    </header>
+
+    <main class="main" role="main">
+        <div class="container">
+            {{if .Flash}}
+            <div class="flash flash-{{.Flash.Type}}" role="alert">
+                {{.Flash.Message}}
+            </div>
+            {{end}}
+
+            {{if .Error}}
+            <div class="alert alert-error" role="alert">
+                <strong>Error:</strong> {{.Error}}
+            </div>
+            {{end}}
+
+            {{block "content" .}}{{end}}
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Storacha Network. Warm Storage Provider Onboarding Service.</p>
+            <p>
+                <a href="https://github.com/storacha/delegator" target="_blank" rel="noopener">GitHub</a> |
+                <a href="/health">Service Health</a>
+            </p>
+        </div>
+    </footer>
+
+    {{block "scripts" .}}{{end}}
+</body>
+</html>

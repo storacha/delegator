@@ -34,8 +34,7 @@ Warm Storage Provider (WSP) onboarding service for the Storacha network. This se
 make build
 
 # Or manually
-go build -o bin/delegator-server ./cmd/server
-go build -o bin/delegator-client ./cmd/client
+go build -o bin/delegator .
 ```
 
 ### Development
@@ -58,46 +57,57 @@ make help
 
 ```bash
 # Start with default settings
-./bin/delegator-server server
+./bin/delegator server
 
 # Start with custom host/port
-./bin/delegator-server server --host 0.0.0.0 --port 8081
+./bin/delegator server --host 0.0.0.0 --port 8081
 
 # Start with config file
-./bin/delegator-server server --config ./config.yaml
+./bin/delegator server --config ./config.yaml
 ```
 
-### Use Client
+### Web Interface
+
+Access the web UI at `http://localhost:8080` for a user-friendly onboarding experience:
+
+- **Dashboard**: Service status and quick onboarding access
+- **Step-by-step onboarding**: Guided WSP registration process
+- **Session tracking**: Monitor progress and download delegations
+- **Mobile-friendly**: Responsive design for all devices
+
+### Command Line Client
 
 ```bash
-# List providers
-./bin/delegator-client client provider list
+# Register a new provider DID
+./bin/delegator client register-did did:key:z6MkjApdj1bAgFyvC9AyNEUxZ3hQKXMLLUmG6rEpkPbSypAv
 
-# Onboard a new provider
-./bin/delegator-client client provider onboard \
-  --did did:key:example123 \
-  --fqdn provider.example.com \
-  --filecoin-address f1abc123 \
-  --proof-set-id proof-123
+# Register FQDN for a session
+./bin/delegator client register-fqdn <session-id> https://your-storage-node.example.com
 
-# Get provider details
-./bin/delegator-client client provider get <provider-id>
+# Submit delegation proof
+./bin/delegator client register-proof <session-id> <delegation-proof>
+
+# Check session status
+./bin/delegator client status <session-id>
 
 # Use custom API URL
-./bin/delegator-client client provider list --api-url http://staging.delegator.warm.storacha.network
+./bin/delegator client --api-url http://staging.delegator.warm.storacha.network status <session-id>
 ```
 
 ## API Endpoints
 
-- `GET /health` - Health check
-- `POST /api/v1/providers/onboard` - Onboard a new provider
-- `GET /api/v1/providers` - List all providers
-- `GET /api/v1/providers/:id` - Get provider details
-- `PUT /api/v1/providers/:id/status` - Update provider status
-- `POST /api/v1/delegations/generate` - Generate delegation
-- `GET /api/v1/delegations/:id` - Get delegation
-- `POST /api/v1/verify/did` - Verify DID
-- `POST /api/v1/verify/fqdn` - Verify FQDN
+### Web Interface
+- `GET /` - Dashboard homepage
+- `GET /onboard` - Onboarding flow interface
+- `GET /onboard/status/:session_id` - Session status page
+- `GET /health` - Service health check
+
+### JSON API
+- `POST /api/v1/onboard/register-did` - Register DID for onboarding
+- `POST /api/v1/onboard/register-fqdn` - Register and verify FQDN
+- `POST /api/v1/onboard/register-proof` - Submit delegation proof
+- `GET /api/v1/onboard/status/:session_id` - Get session status
+- `GET /api/v1/onboard/delegation/:session_id` - Download delegation file
 
 ## Configuration
 

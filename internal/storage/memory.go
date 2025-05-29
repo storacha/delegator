@@ -5,8 +5,12 @@ import (
 	"sync"
 	"time"
 
+	logging "github.com/ipfs/go-log"
+
 	"github.com/storacha/delegator/internal/models"
 )
+
+var log = logging.Logger("storage/memory")
 
 // MemoryStore provides in-memory storage that mimics DynamoDB interfaces
 type MemoryStore struct {
@@ -17,7 +21,7 @@ type MemoryStore struct {
 	mu           sync.RWMutex
 }
 
-// NewMemoryStore creates a new in-memory store
+// NewMemoryStore creates a new in-memory store that implements both SessionStore and PersistentStore
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
 		allowlist:    make(map[string]*models.DIDAllowlist),
@@ -28,36 +32,27 @@ func NewMemoryStore() *MemoryStore {
 }
 
 // DID Allowlist operations
-func (m *MemoryStore) IsAllowedDID(did string) bool {
+// IsAllowedDID checks if a DID is in the allowlist (PersistentStore interface)
+func (m *MemoryStore) IsAllowedDID(did string) (bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	_, exists := m.allowlist[did]
-	return exists
+	return exists, nil
 }
 
-func (m *MemoryStore) AddAllowedDID(entry *models.DIDAllowlist) error {
+// AddAllowedDID adds a DID to the allowlist (PersistentStore interface)
+func (m *MemoryStore) AddAllowedDID(did string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.allowlist[entry.DID] = entry
-	return nil
-}
-
-func (m *MemoryStore) RemoveAllowedDID(did string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.allowlist, did)
-	return nil
-}
-
-func (m *MemoryStore) ListAllowedDIDs() ([]*models.DIDAllowlist, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	result := make([]*models.DIDAllowlist, 0, len(m.allowlist))
-	for _, entry := range m.allowlist {
-		result = append(result, entry)
+	
+	m.allowlist[did] = &models.DIDAllowlist{
+		DID:     did,
+		AddedBy: "system",
+		AddedAt: time.Now(),
+		Notes:   "Added via API",
 	}
-	return result, nil
+	
+	return nil
 }
 
 // Onboarding session operations
@@ -65,16 +60,20 @@ func (m *MemoryStore) CreateSession(session *models.OnboardingSession) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	fmt.Printf("DEBUG MemoryStore.CreateSession: Creating session with ID: %s, DID: %s\n",
-		session.SessionID, session.DID)
+	log.Debugw("Creating session", 
+		"session_id", session.SessionID, 
+		"did", session.DID)
 
 	m.sessions[session.SessionID] = session
 
 	// Dump all current sessions for debugging
-	fmt.Println("DEBUG MemoryStore: Current sessions:")
+	log.Debugw("Current sessions in memory store", "count", len(m.sessions))
 	for id, s := range m.sessions {
-		fmt.Printf("  - %s: DID=%s, Status=%s, Expires=%s\n",
-			id, s.DID, s.Status, s.ExpiresAt.Format(time.RFC3339))
+		log.Debugw("Session details", 
+			"session_id", id, 
+			"did", s.DID, 
+			"status", s.Status, 
+			"expires_at", s.ExpiresAt.Format(time.RFC3339))
 	}
 
 	return nil
@@ -84,30 +83,36 @@ func (m *MemoryStore) GetSession(sessionID string) (*models.OnboardingSession, e
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	fmt.Printf("DEBUG MemoryStore.GetSession: Looking for session ID: %s\n", sessionID)
+	log.Debugw("Looking for session", "session_id", sessionID)
 
 	// Dump all current sessions for debugging
-	fmt.Println("DEBUG MemoryStore: Available sessions:")
+	log.Debugw("Available sessions in memory store", "count", len(m.sessions))
 	for id, s := range m.sessions {
-		fmt.Printf("  - %s: DID=%s, Status=%s, Expires=%s\n",
-			id, s.DID, s.Status, s.ExpiresAt.Format(time.RFC3339))
+		log.Debugw("Session details", 
+			"session_id", id, 
+			"did", s.DID, 
+			"status", s.Status, 
+			"expires_at", s.ExpiresAt.Format(time.RFC3339))
 	}
 
 	session, exists := m.sessions[sessionID]
 	if !exists {
-		fmt.Printf("DEBUG MemoryStore.GetSession: Session not found: %s\n", sessionID)
+		log.Debugw("Session not found", "session_id", sessionID)
 		return nil, fmt.Errorf("session not found: %s", sessionID)
 	}
 
 	// Check if session is expired
 	if time.Now().After(session.ExpiresAt) {
-		fmt.Printf("DEBUG MemoryStore.GetSession: Session expired: %s, expired at %s\n",
-			sessionID, session.ExpiresAt.Format(time.RFC3339))
+		log.Debugw("Session expired", 
+			"session_id", sessionID, 
+			"expired_at", session.ExpiresAt.Format(time.RFC3339))
 		return nil, fmt.Errorf("session expired: %s", sessionID)
 	}
 
-	fmt.Printf("DEBUG MemoryStore.GetSession: Found session: ID=%s, DID=%s, Status=%s\n",
-		session.SessionID, session.DID, session.Status)
+	log.Debugw("Found session",
+		"session_id", session.SessionID, 
+		"did", session.DID, 
+		"status", session.Status)
 
 	return session, nil
 }
@@ -137,12 +142,12 @@ func (m *MemoryStore) GetSessionByDID(did string) (*models.OnboardingSession, er
 	return nil, fmt.Errorf("no active session found for DID: %s", did)
 }
 
-// Provider operations
-func (m *MemoryStore) IsProviderRegistered(did string) bool {
+// IsRegisteredDID checks if a DID is registered as a provider (implements PersistentStore interface)
+func (m *MemoryStore) IsRegisteredDID(did string) (bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	_, exists := m.providers[did]
-	return exists
+	_, exists := m.providerInfo[did]
+	return exists, nil
 }
 
 func (m *MemoryStore) CreateProvider(provider *models.StorageProvider) error {
@@ -150,28 +155,6 @@ func (m *MemoryStore) CreateProvider(provider *models.StorageProvider) error {
 	defer m.mu.Unlock()
 	m.providers[provider.Provider] = provider
 	return nil
-}
-
-func (m *MemoryStore) GetProvider(did string) (*models.StorageProvider, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	provider, exists := m.providers[did]
-	if !exists {
-		return nil, fmt.Errorf("provider not found: %s", did)
-	}
-	return provider, nil
-}
-
-func (m *MemoryStore) ListProviders() ([]*models.StorageProvider, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	result := make([]*models.StorageProvider, 0, len(m.providers))
-	for _, provider := range m.providers {
-		result = append(result, provider)
-	}
-	return result, nil
 }
 
 // Provider info operations
@@ -182,31 +165,7 @@ func (m *MemoryStore) CreateProviderInfo(info *models.StorageProviderInfo) error
 	return nil
 }
 
-func (m *MemoryStore) GetProviderInfo(did string) (*models.StorageProviderInfo, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	info, exists := m.providerInfo[did]
-	if !exists {
-		return nil, fmt.Errorf("provider info not found: %s", did)
-	}
-	return info, nil
-}
-
-// SetAllowedDIDs populates the store with config data
-func (m *MemoryStore) SetAllowedDIDs(allowedDIDs []string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	now := time.Now()
-	for _, did := range allowedDIDs {
-		m.allowlist[did] = &models.DIDAllowlist{
-			DID:     did,
-			AddedBy: "config",
-			AddedAt: now,
-			Notes:   "Loaded from configuration",
-		}
-	}
-
-	return nil
+// RegisterProvider registers a new provider (implements PersistentStore interface)
+func (m *MemoryStore) RegisterProvider(provider *models.StorageProviderInfo) error {
+	return m.CreateProviderInfo(provider)
 }

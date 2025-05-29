@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"fmt"
-
+	logging "github.com/ipfs/go-log"
 	"github.com/spf13/cobra"
 )
+
+var verLog = logging.Logger("version")
 
 // Build information set by ldflags
 var (
@@ -19,10 +20,18 @@ var versionCmd = &cobra.Command{
 	Short: "Show version information",
 	Long:  `Display version, commit hash, and build time information.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Delegator Service\n")
-		fmt.Printf("Version: %s\n", Version)
-		fmt.Printf("Commit: %s\n", Commit)
-		fmt.Printf("Built: %s\n", BuildTime)
+		// Since this is CLI output for user display, we're using cmd.Println
+		// instead of the logging system as these aren't real logs
+		cmd.Println("Delegator Service")
+		cmd.Printf("Version: %s\n", Version)
+		cmd.Printf("Commit: %s\n", Commit)
+		cmd.Printf("Built: %s\n", BuildTime)
+		
+		// Log version info to actual logs (if logging is enabled)
+		verLog.Infow("Version information requested", 
+			"version", Version, 
+			"commit", Commit, 
+			"build_time", BuildTime)
 	},
 }
 

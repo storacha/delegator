@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/sessions"
+	logging "github.com/ipfs/go-log"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -16,36 +17,33 @@ import (
 	"github.com/storacha/delegator/internal/storage"
 )
 
+var log = logging.Logger("server")
+
 // Server represents the HTTP server instance
 type Server struct {
-	echo   *echo.Echo
-	config *config.Config
-	store  storage.Store
-}
-
-type Option func(*serverOptions)
-
-func WithStore(store storage.Store) Option {
-	return func(s *serverOptions) {
-		s.store = store
-	}
-}
-
-type serverOptions struct {
-	store storage.Store
+	echo           *echo.Echo
+	config         *config.Config
+	sessionStore   storage.SessionStore
+	persistedStore storage.PersistentStore
 }
 
 // New creates a new server instance with the provided configuration
-func New(cfg *config.Config, opts ...Option) (*Server, error) {
+func New(cfg *config.Config) (*Server, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config cannot be nil")
 	}
 
-	options := &serverOptions{
-		store: storage.NewMemoryStore(),
+	dynamoStore, err := storage.NewDynamoDBStore(cfg.Dynamo)
+	if err != nil {
+		return nil, err
 	}
-	for _, opt := range opts {
-		opt(options)
+	if err := dynamoStore.Initialize(); err != nil {
+		return nil, err
+	}
+	if len(cfg.Onboarding.AllowList) > 0 {
+		if err := dynamoStore.AddAllowedDID(cfg.Onboarding.AllowList[0]); err != nil {
+			return nil, err
+		}
 	}
 
 	// Create Echo instance
@@ -69,8 +67,8 @@ func New(cfg *config.Config, opts ...Option) (*Server, error) {
 	}
 	e.Use(session.Middleware(cookieStore))
 
-	// Print debug message about session configuration
-	fmt.Printf("DEBUG server: Session middleware configured with key length: %d\n", len(cfg.Server.SessionKey))
+	// Log debug message about session configuration
+	log.Debugw("Session middleware configured", "key_length", len(cfg.Server.SessionKey))
 
 	// Configure server timeouts - convert seconds to proper time.Duration
 	e.Server.ReadTimeout = cfg.Server.ReadTimeout * time.Second
@@ -79,14 +77,16 @@ func New(cfg *config.Config, opts ...Option) (*Server, error) {
 	e.Server.WriteTimeout = cfg.Server.WriteTimeout * time.Second
 
 	// Initialize API routes
-	if err := api.RegisterRoutes(e, cfg, options.store); err != nil {
+	sessionStore := storage.NewMemoryStore()
+	if err := api.RegisterRoutes(e, cfg, sessionStore, dynamoStore); err != nil {
 		return nil, fmt.Errorf("failed to register routes: %w", err)
 	}
 
 	svr := &Server{
-		echo:   e,
-		config: cfg,
-		store:  options.store,
+		echo:           e,
+		config:         cfg,
+		sessionStore:   sessionStore,
+		persistedStore: dynamoStore,
 	}
 
 	return svr, nil
@@ -95,7 +95,7 @@ func New(cfg *config.Config, opts ...Option) (*Server, error) {
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%d", s.config.Server.Host, s.config.Server.Port)
-	fmt.Printf("Starting HTTP server on %s\n", addr)
+	log.Infow("Starting HTTP server", "address", addr)
 
 	if err := s.echo.Start(addr); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server start failed: %w", err)
@@ -106,13 +106,13 @@ func (s *Server) Start() error {
 
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
-	fmt.Println("Shutting down server...")
+	log.Infow("Shutting down server")
 
 	if err := s.echo.Shutdown(ctx); err != nil {
 		return fmt.Errorf("server shutdown failed: %w", err)
 	}
 
-	fmt.Println("Server exited")
+	log.Infow("Server exited")
 	return nil
 }
 
@@ -121,6 +121,12 @@ func (s *Server) Echo() *echo.Echo {
 	return s.echo
 }
 
-func (s *Server) Store() storage.Store {
-	return s.store
+// SessionStore returns the session store
+func (s *Server) SessionStore() storage.SessionStore {
+	return s.sessionStore
+}
+
+// PersistentStore returns the persistent store
+func (s *Server) PersistentStore() storage.PersistentStore {
+	return s.persistedStore
 }

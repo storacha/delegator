@@ -105,12 +105,21 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 // RegisterDID registers a DID and initiates the onboarding process.
 // Returns the session ID and delegation download URL.
 func (c *Client) RegisterDID(ctx context.Context, did string) (*models.DIDVerifyResponse, error) {
+	return c.RegisterDIDWithOptions(ctx, did, "", 0, "")
+}
+
+// RegisterDIDWithOptions registers a DID with additional information and initiates the onboarding process.
+// Returns the session ID and delegation download URL.
+func (c *Client) RegisterDIDWithOptions(ctx context.Context, did string, filecoinAddress string, proofSetID uint64, operatorEmail string) (*models.DIDVerifyResponse, error) {
 	if did == "" {
 		return nil, fmt.Errorf("DID cannot be empty")
 	}
 
 	req := models.DIDRegisterRequest{
-		DID: did,
+		DID:             did,
+		FilecoinAddress: filecoinAddress,
+		ProofSetID:      proofSetID,
+		OperatorEmail:   operatorEmail,
 	}
 
 	var resp models.DIDVerifyResponse

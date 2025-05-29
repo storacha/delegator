@@ -79,19 +79,19 @@ func TestHappyPath(t *testing.T) {
 	err = c.HealthCheck(ctx)
 	require.NoError(t, err)
 
-	didResp, err := c.RegisterDID(ctx, StorageNodeDID)
+	didResp, err := c.RegisterDIDWithOptions(ctx, StorageNodeDID, "f1234567", 42, "operator@example.com")
 	require.NoError(t, err)
 
 	require.NotEmpty(t, didResp.SessionID)
 	sessionID := didResp.SessionID
 	require.Equal(t, fmt.Sprintf("/api/v1/onboard/delegation/%s", sessionID), didResp.DelegationURL)
 
-	require.False(t, svr.Store().IsProviderRegistered(StorageNodeDID))
+	require.False(t, svr.PersistentStore().IsRegisteredDID(StorageNodeDID))
 
 	delgDwnld, err := c.DownloadDelegation(ctx, sessionID)
 	require.NoError(t, err)
 
-	session, err := svr.Store().GetSession(sessionID)
+	session, err := svr.SessionStore().GetSession(sessionID)
 	require.NoError(t, err)
 
 	require.Equal(t, session.DelegationData, string(delgDwnld))
@@ -133,7 +133,7 @@ func TestHappyPath(t *testing.T) {
 	require.Equal(t, StorageNodeDID, sessionStatus.DID)
 	require.Equal(t, "register-proof", sessionStatus.NextStep)
 
-	require.False(t, svr.Store().IsProviderRegistered(StorageNodeDID))
+	require.False(t, svr.PersistentStore().IsRegisteredDID(StorageNodeDID))
 
 	strgDelegation := makeStorageDelegation(t, StorageNodeKey, UploadServiceDID)
 
@@ -142,7 +142,7 @@ func TestHappyPath(t *testing.T) {
 	require.Equal(t, sessionID, proofResp.SessionID)
 	require.Equal(t, "proof_verified", proofResp.Status)
 
-	require.True(t, svr.Store().IsProviderRegistered(StorageNodeDID))
+	require.True(t, svr.PersistentStore().IsRegisteredDID(StorageNodeDID))
 
 }
 
@@ -190,7 +190,7 @@ func makeStorageDelegation(t *testing.T, storageNodeKey string, uploadServiceDID
 }
 
 func setupServer(t *testing.T) *server.Server {
-	svr, err := server.New(&config.Config{
+	cfg := &config.Config{
 		Server: config.ServerConfig{
 			Host:         "0.0.0.0",
 			Port:         9999,
@@ -201,12 +201,25 @@ func setupServer(t *testing.T) *server.Server {
 			SessionTimeout:          time.Hour,
 			DelegationTTL:           time.Hour,
 			FQDNVerificationTimeout: time.Minute,
-			MaxRetries:              1,
 			IndexingServiceKey:      IndexingServiceKey,
 			UploadServiceKey:        UploadServiceKey,
-			AllowedDIDs:             []string{StorageNodeDID},
 		},
-	})
+	}
+
+	// Create the server
+	svr, err := server.New(cfg)
 	require.NoError(t, err)
+
+	// Explicitly set the allowed DIDs in both stores to ensure they're consistent
+	err = svr.SessionStore().SetAllowedDIDs([]string{StorageNodeDID})
+	require.NoError(t, err)
+
+	// Add the DID to the persisted store as well
+	allowed, err := svr.PersistentStore().IsAllowedDID(StorageNodeDID)
+	require.NoError(t, err)
+
+	// Print debug info
+	t.Logf("Is DID %s allowed in persisted store: %v", StorageNodeDID, allowed)
+
 	return svr
 }

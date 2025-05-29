@@ -23,9 +23,10 @@ type OnboardingHandler struct {
 }
 
 // NewOnboardingHandler creates a new onboarding handler
-func NewOnboardingHandler(store storage.Store, cfg config.OnboardingConfig) (*OnboardingHandler, error) {
-	sessionTimeout := time.Duration(cfg.SessionTimeout) * time.Second
-	delegationTTL := time.Duration(cfg.DelegationTTL) * time.Second
+func NewOnboardingHandler(sessionStore storage.SessionStore, persistedStore storage.PersistentStore, cfg config.OnboardingConfig) (*OnboardingHandler, error) {
+	sessionTimeout := cfg.SessionTimeout * time.Second
+	delegationTTL := cfg.DelegationTTL * time.Second
+	fqdnTimeout := cfg.FQDNVerificationTimeout * time.Second
 
 	indexingService, err := ed25519.Parse(cfg.IndexingServiceKey)
 	if err != nil {
@@ -36,7 +37,7 @@ func NewOnboardingHandler(store storage.Store, cfg config.OnboardingConfig) (*On
 		return nil, fmt.Errorf("error parsing configured upload service: %w", err)
 	}
 
-	service := services.NewOnboardingService(store, sessionTimeout, delegationTTL, indexingService, uploadService)
+	service := services.NewOnboardingService(sessionStore, persistedStore, sessionTimeout, delegationTTL, fqdnTimeout, indexingService, uploadService)
 
 	return &OnboardingHandler{
 		service: service,
@@ -347,4 +348,86 @@ func (h *OnboardingHandler) getDelegation(c echo.Context) error {
 	c.Response().Header().Set("Content-Type", "application/json")
 	c.Response().Header().Set("Content-Disposition", "attachment; filename=delegation.json")
 	return c.Blob(http.StatusOK, "application/octet-stream", []byte(delegationData))
+}
+
+// ProviderSubmitRequest represents the request to submit a provider to the network
+type ProviderSubmitRequest struct {
+	SessionID string `json:"session_id" validate:"required"`
+}
+
+// submitProvider handles the final provider submission
+func (h *OnboardingHandler) submitProvider(c echo.Context) error {
+	var req ProviderSubmitRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+			Code:    http.StatusBadRequest,
+		})
+	}
+
+	if req.SessionID == "" {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "missing_session_id",
+			Message: "Session ID is required",
+			Code:    http.StatusBadRequest,
+		})
+	}
+
+	// Get session status to check if it's in the right state
+	session, err := h.service.GetSessionStatus(req.SessionID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error:   "session_not_found",
+			Message: fmt.Sprintf("Session '%s' not found", req.SessionID),
+			Code:    http.StatusNotFound,
+		})
+	}
+
+	// Check session state
+	if session.Status != models.StatusProofVerified {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "invalid_session_state",
+			Message: "Provider must have a verified proof before submission",
+			Code:    http.StatusBadRequest,
+		})
+	}
+
+	// Submit the provider to the persistent store using our new service method
+	err = h.service.SubmitProvider(req.SessionID)
+	if err != nil {
+		if errors.Is(err, services.ErrSessionNotFound) {
+			return c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error:   "session_not_found",
+				Message: fmt.Sprintf("Session '%s' not found", req.SessionID),
+				Code:    http.StatusNotFound,
+			})
+		} else if errors.Is(err, services.ErrInvalidSessionState) {
+			return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+				Error:   "invalid_session_state",
+				Message: err.Error(),
+				Code:    http.StatusBadRequest,
+			})
+		}
+		
+		// For any other errors
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "registration_failed",
+			Message: fmt.Sprintf("Failed to register provider: %v", err),
+			Code:    http.StatusInternalServerError,
+		})
+	}
+
+	// Get the updated status
+	updatedSession, _ := h.service.GetSessionStatus(req.SessionID)
+
+	return c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Message: "Provider successfully registered with the network",
+		Data: map[string]interface{}{
+			"session_id": req.SessionID,
+			"status":     updatedSession.Status,
+			"did":        updatedSession.DID,
+		},
+	})
 }

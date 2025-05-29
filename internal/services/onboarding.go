@@ -31,29 +31,35 @@ var log = logging.Logger("service/onboarding")
 
 // OnboardingService handles WSP onboarding logic
 type OnboardingService struct {
-	store           storage.Store
-	sessionTimeout  time.Duration
-	delegationTTL   time.Duration
-	indexingService ucan.Signer
-	uploadService   ucan.Signer
+	sessionStore       storage.SessionStore
+	persistedStore     storage.PersistentStore
+	sessionTimeout     time.Duration
+	domainCheckTimeout time.Duration
+	delegationTTL      time.Duration
+	indexingService    ucan.Signer
+	uploadService      ucan.Signer
 }
 
 // NewOnboardingService creates a new onboarding service
 func NewOnboardingService(
-	store storage.Store,
-	sessionTimeout, delegationTTL time.Duration,
+	sessionStore storage.SessionStore,
+	persistedStore storage.PersistentStore,
+	sessionTimeout, delegationTTL, domainCheckTimeout time.Duration,
 	indexingService, uploadService ucan.Signer,
 ) *OnboardingService {
 	return &OnboardingService{
-		store:           store,
-		sessionTimeout:  sessionTimeout,
-		delegationTTL:   delegationTTL,
-		indexingService: indexingService,
-		uploadService:   uploadService,
+		sessionStore:       sessionStore,
+		persistedStore:     persistedStore,
+		sessionTimeout:     sessionTimeout,
+		delegationTTL:      delegationTTL,
+		domainCheckTimeout: domainCheckTimeout,
+		indexingService:    indexingService,
+		uploadService:      uploadService,
 	}
 }
 
 var (
+	ErrPersistedStorageFailure = errors.New("unable to read from persisted storage")
 	ErrIsNotAllowed            = errors.New("DID not allowed")
 	ErrIsAlreadyRegistered     = errors.New("DID already registered")
 	ErrSessionNotFound         = errors.New("session not found")
@@ -64,18 +70,26 @@ var (
 
 // RegisterDID performs Step 3.1: DID registration, verification and delegation generation
 func (s *OnboardingService) RegisterDID(strgDID did.DID, filecoinAddress string, proofSetID uint64, operatorEmail string) (*models.DIDVerifyResponse, error) {
-	// Check if DID is in allowlist
-	if !s.store.IsAllowedDID(strgDID.String()) {
+	// Check if DID is in allowlist of the persisted store.
+	if allowed, err := s.persistedStore.IsAllowedDID(strgDID.String()); err != nil {
+		log.Errorw("failed to check if DID is allowed for registration in persisted store", "did", strgDID.String(), "error", err)
+		return nil, ErrPersistedStorageFailure
+	} else if !allowed {
+		log.Infow("disallowed DID attempted to register and was rejected", "did", strgDID.String())
 		return nil, ErrIsNotAllowed
 	}
 
 	// Check if DID is already registered
-	if s.store.IsProviderRegistered(strgDID.String()) {
+	if registered, err := s.persistedStore.IsRegisteredDID(strgDID.String()); err != nil {
+		log.Errorw("failed to check if DID is already resgistered for registration in persisted store", "did", strgDID.String(), "error", err)
+		return nil, ErrPersistedStorageFailure
+	} else if registered {
+		log.Infow("registered DID attempted to register again and was rejected", "did", strgDID.String())
 		return nil, ErrIsAlreadyRegistered
 	}
 
 	// Check for existing active session
-	if existingSession, err := s.store.GetSessionByDID(strgDID.String()); err == nil {
+	if existingSession, err := s.sessionStore.GetSessionByDID(strgDID.String()); err == nil {
 		// Return existing session if still valid
 		if time.Now().Before(existingSession.ExpiresAt) {
 			return &models.DIDVerifyResponse{
@@ -111,7 +125,7 @@ func (s *OnboardingService) RegisterDID(strgDID did.DID, filecoinAddress string,
 		ExpiresAt:       now.Add(s.sessionTimeout),
 	}
 
-	if err := s.store.CreateSession(session); err != nil {
+	if err := s.sessionStore.CreateSession(session); err != nil {
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
@@ -126,7 +140,7 @@ func (s *OnboardingService) RegisterDID(strgDID did.DID, filecoinAddress string,
 
 // GetSessionStatus returns the status of an onboarding session
 func (s *OnboardingService) GetSessionStatus(sessionID string) (*models.OnboardingStatusResponse, error) {
-	session, err := s.store.GetSession(sessionID)
+	session, err := s.sessionStore.GetSession(sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +162,7 @@ func (s *OnboardingService) GetSessionStatus(sessionID string) (*models.Onboardi
 
 // GetDelegation returns the delegation data for a session
 func (s *OnboardingService) GetDelegation(sessionID string) (string, error) {
-	session, err := s.store.GetSession(sessionID)
+	session, err := s.sessionStore.GetSession(sessionID)
 	if err != nil {
 		return "", err
 	}
@@ -163,42 +177,34 @@ func (s *OnboardingService) GetDelegation(sessionID string) (string, error) {
 // RegisterFQDN performs Step 3.3: FQDN verification and readiness check
 func (s *OnboardingService) RegisterFQDN(sessionID string, fqdnURL url.URL) (*models.FQDNVerifyResponse, error) {
 	// Debug log
-	fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Called with sessionID=%s, URL=%s\n",
-		sessionID, fqdnURL.String())
+	log.Debugw("RegisterFQDN called", "session_id", sessionID, "url", fqdnURL.String())
 
 	// Get the session
-	session, err := s.store.GetSession(sessionID)
+	session, err := s.sessionStore.GetSession(strings.TrimSpace(sessionID))
 	if err != nil {
-		fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Session not found: %v\n", err)
-
-		// Try one more time with a trimmed session ID (in case there are whitespace issues)
-		trimmedID := strings.TrimSpace(sessionID)
-		if trimmedID != sessionID {
-			fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Trying with trimmed session ID: '%s'\n", trimmedID)
-			session, err = s.store.GetSession(trimmedID)
-			if err == nil {
-				sessionID = trimmedID
-				fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Found session with trimmed ID\n")
-			}
-		}
-
-		if err != nil {
-			return nil, ErrSessionNotFound
-		}
+		return nil, ErrSessionNotFound
 	}
 
-	fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Found session: %+v\n", *session)
+	log.Debugw("Found session for FQDN registration", 
+		"session_id", session.SessionID, 
+		"did", session.DID, 
+		"status", session.Status, 
+		"expires_at", session.ExpiresAt)
 
 	// Check if session has expired
 	if time.Now().After(session.ExpiresAt) {
-		fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Session expired at %s\n",
-			session.ExpiresAt.Format(time.RFC3339))
+		log.Debugw("Session expired", 
+			"session_id", session.SessionID, 
+			"expired_at", session.ExpiresAt.Format(time.RFC3339))
 		return nil, fmt.Errorf("%w: session expired", ErrInvalidSessionState)
 	}
 
 	// Check if session is in the correct state (should be DID verified)
 	if session.Status != models.StatusDIDVerified {
-		fmt.Printf("DEBUG OnboardingService.RegisterFQDN: Wrong session state: %s\n", session.Status)
+		log.Debugw("Wrong session state for FQDN registration", 
+			"session_id", session.SessionID,
+			"expected_status", models.StatusDIDVerified,
+			"actual_status", session.Status)
 		return nil, fmt.Errorf("%w: expected status '%s', got '%s'",
 			ErrInvalidSessionState, models.StatusDIDVerified, session.Status)
 	}
@@ -213,7 +219,7 @@ func (s *OnboardingService) RegisterFQDN(sessionID string, fqdnURL url.URL) (*mo
 	session.Status = models.StatusFQDNVerified
 	session.UpdatedAt = time.Now()
 
-	if err := s.store.UpdateSession(session); err != nil {
+	if err := s.sessionStore.UpdateSession(session); err != nil {
 		return nil, fmt.Errorf("failed to update session: %w", err)
 	}
 
@@ -227,21 +233,21 @@ func (s *OnboardingService) RegisterFQDN(sessionID string, fqdnURL url.URL) (*mo
 // RegisterProof performs Step 3.4: Proof verification and provider registration
 func (s *OnboardingService) RegisterProof(sessionID string, proof string) (*models.ProofVerifyResponse, error) {
 	// Debug log
-	fmt.Printf("DEBUG OnboardingService.RegisterProof: Called with sessionID=%s\n", sessionID)
+	log.Debugw("RegisterProof called", "session_id", sessionID)
 
 	// Get the session
-	session, err := s.store.GetSession(sessionID)
+	session, err := s.sessionStore.GetSession(sessionID)
 	if err != nil {
-		fmt.Printf("DEBUG OnboardingService.RegisterProof: Session not found: %v\n", err)
+		log.Debugw("Session not found for RegisterProof", "session_id", sessionID, "error", err)
 
 		// Try one more time with a trimmed session ID (in case there are whitespace issues)
 		trimmedID := strings.TrimSpace(sessionID)
 		if trimmedID != sessionID {
-			fmt.Printf("DEBUG OnboardingService.RegisterProof: Trying with trimmed session ID: '%s'\n", trimmedID)
-			session, err = s.store.GetSession(trimmedID)
+			log.Debugw("Trying with trimmed session ID", "trimmed_id", trimmedID)
+			session, err = s.sessionStore.GetSession(trimmedID)
 			if err == nil {
 				sessionID = trimmedID
-				fmt.Printf("DEBUG OnboardingService.RegisterProof: Found session with trimmed ID\n")
+				log.Debugw("Found session with trimmed ID", "session_id", sessionID)
 			}
 		}
 
@@ -250,18 +256,26 @@ func (s *OnboardingService) RegisterProof(sessionID string, proof string) (*mode
 		}
 	}
 
-	fmt.Printf("DEBUG OnboardingService.RegisterProof: Found session: %+v\n", *session)
+	log.Debugw("Found session for RegisterProof",
+		"session_id", session.SessionID,
+		"did", session.DID,
+		"status", session.Status,
+		"expires_at", session.ExpiresAt)
 
 	// Check if session has expired
 	if time.Now().After(session.ExpiresAt) {
-		fmt.Printf("DEBUG OnboardingService.RegisterProof: Session expired at %s\n",
-			session.ExpiresAt.Format(time.RFC3339))
+		log.Debugw("Session expired for RegisterProof",
+			"session_id", session.SessionID,
+			"expired_at", session.ExpiresAt.Format(time.RFC3339))
 		return nil, fmt.Errorf("%w: session expired", ErrInvalidSessionState)
 	}
 
 	// Check if session is in the correct state (should be FQDN verified)
 	if session.Status != models.StatusFQDNVerified {
-		fmt.Printf("DEBUG OnboardingService.RegisterProof: Wrong session state: %s\n", session.Status)
+		log.Debugw("Wrong session state for RegisterProof",
+			"session_id", session.SessionID,
+			"expected_status", models.StatusFQDNVerified,
+			"actual_status", session.Status)
 		return nil, fmt.Errorf("%w: expected status '%s', got '%s'",
 			ErrInvalidSessionState, models.StatusFQDNVerified, session.Status)
 	}
@@ -276,7 +290,7 @@ func (s *OnboardingService) RegisterProof(sessionID string, proof string) (*mode
 	session.Status = models.StatusProofVerified
 	session.UpdatedAt = time.Now()
 
-	if err := s.store.UpdateSession(session); err != nil {
+	if err := s.sessionStore.UpdateSession(session); err != nil {
 		return nil, fmt.Errorf("failed to update session: %w", err)
 	}
 
@@ -429,35 +443,69 @@ func (s *OnboardingService) validateProof(proof string, providerDID string) erro
 func (s *OnboardingService) storeProvider(session *models.OnboardingSession) error {
 	now := time.Now()
 
-	provider := &models.StorageProvider{
-		Provider:   session.DID,
-		Endpoint:   session.FQDN,
-		Proof:      session.Proof,
-		Weight:     1, // Default weight
-		InsertedAt: now,
-		UpdatedAt:  now,
-	}
-
-	// Store in the provider registry
-	if err := s.store.CreateProvider(provider); err != nil {
-		return fmt.Errorf("failed to create provider: %w", err)
-	}
-
 	// Store provider info with Filecoin address, ProofSetID, and OperatorEmail
 	providerInfo := &models.StorageProviderInfo{
 		Provider:      session.DID,
 		Endpoint:      session.FQDN,
 		Address:       session.FilecoinAddress,
-		ProofSet:      fmt.Sprintf("%d", session.ProofSetID), // Convert to string as per the model
+		ProofSet:      session.ProofSetID,
 		OperatorEmail: session.OperatorEmail,
+		Proof:         session.Proof,
 		InsertedAt:    now,
 		UpdatedAt:     now,
 	}
 
 	// Assuming a CreateProviderInfo method exists in the store
 	// If it doesn't, you'll need to add this method to the storage interface
-	if err := s.store.CreateProviderInfo(providerInfo); err != nil {
+	if err := s.sessionStore.CreateProviderInfo(providerInfo); err != nil {
 		return fmt.Errorf("failed to create provider info: %w", err)
+	}
+
+	return nil
+}
+
+// SubmitProvider handles the final submission of a provider to the persistent store
+func (s *OnboardingService) SubmitProvider(sessionID string) error {
+	// Get the session
+	session, err := s.sessionStore.GetSession(sessionID)
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrSessionNotFound, err.Error())
+	}
+
+	// Check if session has expired
+	if time.Now().After(session.ExpiresAt) {
+		return fmt.Errorf("%w: session expired", ErrInvalidSessionState)
+	}
+
+	// Check if session is in the correct state (should be proof verified)
+	if session.Status != models.StatusProofVerified {
+		return fmt.Errorf("%w: expected status '%s', got '%s'",
+			ErrInvalidSessionState, models.StatusProofVerified, session.Status)
+	}
+
+	// Create provider info for persistent storage
+	now := time.Now()
+	providerInfo := &models.StorageProviderInfo{
+		Provider:      session.DID,
+		Endpoint:      session.FQDN,
+		Address:       session.FilecoinAddress,
+		ProofSet:      session.ProofSetID,
+		OperatorEmail: session.OperatorEmail,
+		Proof:         session.Proof,
+		InsertedAt:    now,
+		UpdatedAt:     now,
+	}
+
+	// Register provider in the persistent store
+	if err := s.persistedStore.RegisterProvider(providerInfo); err != nil {
+		return fmt.Errorf("failed to register provider: %w", err)
+	}
+
+	// Update session status to completed
+	session.Status = models.StatusCompleted
+	session.UpdatedAt = now
+	if err := s.sessionStore.UpdateSession(session); err != nil {
+		return fmt.Errorf("failed to update session status: %w", err)
 	}
 
 	return nil
@@ -482,9 +530,10 @@ func (s *OnboardingService) getNextStep(status string) string {
 }
 
 // NewOnboardingServiceFromConfig creates a new onboarding service from config
-func NewOnboardingServiceFromConfig(store storage.Store, cfg config.OnboardingConfig) (*OnboardingService, error) {
-	sessionTimeout := time.Duration(cfg.SessionTimeout) * time.Second
-	delegationTTL := time.Duration(cfg.DelegationTTL) * time.Second
+func NewOnboardingServiceFromConfig(sessionStore storage.SessionStore, persistedStore storage.PersistentStore, cfg config.OnboardingConfig) (*OnboardingService, error) {
+	sessionTimeout := cfg.SessionTimeout * time.Second
+	delegationTTL := cfg.DelegationTTL * time.Second
+	fqdnTimeout := cfg.FQDNVerificationTimeout * time.Second
 
 	indexingService, err := ed25519.Parse(cfg.IndexingServiceKey)
 	if err != nil {
@@ -495,5 +544,5 @@ func NewOnboardingServiceFromConfig(store storage.Store, cfg config.OnboardingCo
 		return nil, fmt.Errorf("error parsing configured upload service: %w", err)
 	}
 
-	return NewOnboardingService(store, sessionTimeout, delegationTTL, indexingService, uploadService), nil
+	return NewOnboardingService(sessionStore, persistedStore, sessionTimeout, delegationTTL, fqdnTimeout, indexingService, uploadService), nil
 }

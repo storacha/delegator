@@ -25,4 +25,6 @@ onboarding:
     extra_capabilities: "store/get store/list"
     node_config_options: "--auto-respond --timeout 30"
     did_flags: "--output-key --output-format=jwk"
+dynamo:
+  endpoint: "http://localhost:8000"
 

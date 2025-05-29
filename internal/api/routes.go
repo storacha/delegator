@@ -14,19 +14,14 @@ import (
 )
 
 // RegisterRoutes registers all API and web routes
-func RegisterRoutes(e *echo.Echo, cfg *config.Config, store storage.Store) error {
+func RegisterRoutes(e *echo.Echo, cfg *config.Config, sessionStore storage.SessionStore, persistedStore storage.PersistentStore) error {
 	// Simple test route first
 	e.GET("/ping", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "pong"})
 	})
 
-	// Initialize storage
-	if err := store.SetAllowedDIDs(cfg.Onboarding.AllowedDIDs); err != nil {
-		return err
-	}
-
 	// Initialize API handlers
-	onboardingHandler, err := NewOnboardingHandler(store, cfg.Onboarding)
+	onboardingHandler, err := NewOnboardingHandler(sessionStore, persistedStore, cfg.Onboarding)
 	if err != nil {
 		return fmt.Errorf("creating onboarding handler: %w", err)
 	}
@@ -44,7 +39,7 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, store storage.Store) error
 		e.Static("/static", "web/static")
 
 		// Initialize web handlers
-		webHandler, err := handlers.NewWebHandler(templatesDir, store, cfg)
+		webHandler, err := handlers.NewWebHandler(templatesDir, sessionStore, persistedStore, cfg)
 		if err == nil {
 			// Web UI routes (HTML pages)
 			e.GET("/", webHandler.Home)
@@ -53,6 +48,7 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, store storage.Store) error
 			e.POST("/onboard/register-did", webHandler.RegisterDID)
 			e.POST("/onboard/register-fqdn", webHandler.RegisterFQDN)
 			e.POST("/onboard/register-proof", webHandler.RegisterProof)
+			e.POST("/onboard/submit-provider", webHandler.SubmitProvider)
 			// Use path param only for session ID since we've removed query param support
 			e.GET("/onboard/status/:session_id", webHandler.SessionStatus)
 			e.GET("/onboard/status", webHandler.SessionStatus) // Will use cookie
@@ -94,6 +90,7 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, store storage.Store) error
 	onboard.POST("/register-did", onboardingHandler.registerDID)
 	onboard.POST("/register-fqdn", onboardingHandler.registerFQDN)
 	onboard.POST("/register-proof", onboardingHandler.registerProof)
+	onboard.POST("/submit-provider", onboardingHandler.submitProvider)
 	onboard.GET("/status/:session_id", onboardingHandler.getSessionStatus)
 	onboard.GET("/delegation/:session_id", onboardingHandler.getDelegation)
 

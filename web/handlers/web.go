@@ -29,14 +29,15 @@ var log = logging.Logger("web")
 
 // WebHandler handles web UI requests
 type WebHandler struct {
-	templates *template.Template
-	store     storage.Store
-	config    *config.Config
-	helpTexts *models.OnboardingHelpTexts
+	templates      *template.Template
+	sessionStore   storage.SessionStore
+	persistedStore storage.PersistentStore
+	config         *config.Config
+	helpTexts      *models.OnboardingHelpTexts
 }
 
 // NewWebHandler creates a new web handler
-func NewWebHandler(templatesDir string, store storage.Store, cfg *config.Config) (*WebHandler, error) {
+func NewWebHandler(templatesDir string, sessionStore storage.SessionStore, persistedStore storage.PersistentStore, cfg *config.Config) (*WebHandler, error) {
 	// Parse templates
 	templates, err := template.ParseGlob(filepath.Join(templatesDir, "*.html"))
 	if err != nil {
@@ -57,10 +58,11 @@ func NewWebHandler(templatesDir string, store storage.Store, cfg *config.Config)
 	helpTexts := models.GenerateHelpTexts(configMap)
 
 	return &WebHandler{
-		templates: templates,
-		store:     store,
-		config:    cfg,
-		helpTexts: helpTexts,
+		templates:      templates,
+		sessionStore:   sessionStore,
+		persistedStore: persistedStore,
+		config:         cfg,
+		helpTexts:      helpTexts,
 	}, nil
 }
 
@@ -207,7 +209,7 @@ func (h *WebHandler) setSessionCookie(c echo.Context, sessionID string) {
 	// Save session
 	err = sess.Save(c.Request(), c.Response())
 	if err != nil {
-		log.Errorf("DEBUG setSessionCookie: Error saving session: %v", err)
+		log.Errorw("Error saving session cookie", "error", err)
 	}
 }
 
@@ -233,7 +235,7 @@ func (h *WebHandler) clearSessionCookie(c echo.Context) {
 	// Save the session to apply changes
 	err = sess.Save(c.Request(), c.Response())
 	if err != nil {
-		log.Errorf("DEBUG clearSessionCookie: Error clearing session: %v", err)
+		log.Errorw("Error clearing session cookie", "error", err)
 	}
 }
 

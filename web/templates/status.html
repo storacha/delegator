@@ -95,6 +95,9 @@
             {{else if eq .NextStep "register-proof"}}
             <p>Your FQDN has been verified. Next, submit your delegation proof to complete onboarding.</p>
             <a href="/onboard?session_id={{.Session.SessionID}}&step=3" class="btn btn-primary">Continue to Proof Submission</a>
+            {{else if eq .NextStep "submit-provider"}}
+            <p>Your proof has been verified. Now submit your provider to the network to finalize registration.</p>
+            <a href="/onboard?session_id={{.Session.SessionID}}&step=4" class="btn btn-primary">Continue to Final Submission</a>
             {{else if eq .Session.Status "completed"}}
             <p>🎉 Your onboarding is complete! Your WSP is now registered with the Storacha network.</p>
             <a href="/" class="btn btn-primary">Return to Dashboard</a>

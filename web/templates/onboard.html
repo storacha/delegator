@@ -14,8 +14,12 @@
             <span class="step-number">3</span>
             <span class="step-label">Proof Submission</span>
         </div>
-        <div class="progress-step {{if eq .Step 4}}active{{end}}">
+        <div class="progress-step {{if eq .Step 4}}active{{else if gt .Step 4}}completed{{end}}">
             <span class="step-number">4</span>
+            <span class="step-label">Review</span>
+        </div>
+        <div class="progress-step {{if eq .Step 5}}active{{end}}">
+            <span class="step-number">5</span>
             <span class="step-label">Complete</span>
         </div>
     </div>
@@ -273,10 +277,53 @@
 {{if eq .Step 4}}
 <div class="onboard-step">
     <div class="step-content success">
+        <h2>Ready to Submit</h2>
+        <p>
+            Your information has been verified and is ready to be submitted to the network.
+            Please review the details below and click "Submit to Network" to finalize your registration.
+        </p>
+        
+        {{if .Session}}
+        <div class="session-info success">
+            <h3>Registration Details</h3>
+            <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
+            <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
+            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
+            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
+            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
+            <p><strong>FQDN:</strong> <code>{{.Session.FQDN}}</code></p>
+            <p><strong>Status:</strong> <span class="status-pending">⏱ Ready for Submission</span></p>
+            
+            {{if .Session.DelegationData}}
+            <div class="delegation-download">
+                <h4>Your Delegation</h4>
+                <p>Download your delegation file for your records:</p>
+                <a href="/onboard/delegation/{{.Session.SessionID}}" class="btn btn-secondary" download>
+                    📄 Download Delegation File
+                </a>
+            </div>
+            {{end}}
+        </div>
+        
+        <form action="/onboard/submit-provider" method="post" class="onboard-form">
+            <input type="hidden" name="session_id" value="{{if .Session}}{{.Session.SessionID}}{{else}}{{.SessionID}}{{end}}">
+            <div class="form-actions submission-actions">
+                <button type="submit" class="btn btn-success">Submit to Network</button>
+                <a href="/onboard/new" class="btn btn-secondary">Start Over</a>
+            </div>
+        </form>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{if eq .Step 5}}
+<div class="onboard-step">
+    <div class="step-content success">
         <h2>🎉 Onboarding Complete!</h2>
         <p>
             Congratulations! Your Warm Storage Provider has been successfully registered 
-            with the Storacha network.
+            with the Storacha network and is now active.
         </p>
         
         {{if .Session}}

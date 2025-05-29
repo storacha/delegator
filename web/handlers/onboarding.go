@@ -15,6 +15,8 @@ import (
 	"github.com/storacha/delegator/internal/services"
 )
 
+// Note: We already have a logger in web.go as log = logging.Logger("web")
+
 // OnboardingTemplateData represents onboarding page data
 type OnboardingTemplateData struct {
 	*TemplateData
@@ -54,12 +56,12 @@ func (h *WebHandler) OnboardingIndex(c echo.Context) error {
 
 	// If session ID is provided, get session and determine step
 	if sessionID != "" {
-		session, err := h.store.GetSession(sessionID)
+		session, err := h.sessionStore.GetSession(sessionID)
 		if err == nil {
 			data.Session = session
 			data.Step = h.getStepFromStatus(session.Status)
 		} else {
-			fmt.Printf("ERROR retrieving session '%s': %v\n", sessionID, err)
+			log.Errorw("OnboardingIndex: Error retrieving session", "session_id", sessionID, "error", err)
 			// For the test session, create a dummy session to help debug
 			if sessionID == "test-session" {
 				data.Session = &models.OnboardingSession{
@@ -73,7 +75,7 @@ func (h *WebHandler) OnboardingIndex(c echo.Context) error {
 
 	// Override step if explicitly provided
 	if stepParam != "" {
-		if step, err := strconv.Atoi(stepParam); err == nil && step >= 1 && step <= 4 {
+		if step, err := strconv.Atoi(stepParam); err == nil && step >= 1 && step <= 5 {
 			data.Step = step
 		}
 	}
@@ -92,19 +94,22 @@ func (h *WebHandler) NewOnboardingSession(c echo.Context) error {
 
 // RegisterDID handles DID registration form submission
 func (h *WebHandler) RegisterDID(c echo.Context) error {
-	fmt.Println("DEBUG RegisterDID: Handler called")
+	log.Debug("RegisterDID: Handler called")
 
 	didStr := c.FormValue("did")
 	filecoinAddr := c.FormValue("filecoin_address")
 	proofSetIDStr := c.FormValue("proof_set_id")
 	operatorEmail := c.FormValue("operator_email")
-	
-	fmt.Printf("DEBUG RegisterDID: DID value: %s, Filecoin Address: %s, Proof Set ID: %s, Operator Email: %s\n", 
-		didStr, filecoinAddr, proofSetIDStr, operatorEmail)
+
+	log.Debugw("RegisterDID: Form values",
+		"did", didStr,
+		"filecoin_address", filecoinAddr,
+		"proof_set_id", proofSetIDStr,
+		"operator_email", operatorEmail)
 
 	// Check for existing session
 	existingSessionID := h.getSessionID(c)
-	fmt.Printf("DEBUG RegisterDID: Existing session ID: %s\n", existingSessionID)
+	log.Debugw("RegisterDID: Existing session ID", "session_id", existingSessionID)
 
 	// Parse proof set ID
 	var proofSetID uint64
@@ -165,11 +170,14 @@ func (h *WebHandler) RegisterDID(c echo.Context) error {
 	}
 
 	// Register DID
-	fmt.Printf("DEBUG RegisterDID: Calling service.RegisterDID with DID: %s, Filecoin Address: %s, Proof Set ID: %d, Operator Email: %s\n", 
-		parsedDID.String(), filecoinAddr, proofSetID, operatorEmail)
+	log.Debugw("RegisterDID: Calling service.RegisterDID",
+		"did", parsedDID.String(),
+		"filecoin_address", filecoinAddr,
+		"proof_set_id", proofSetID,
+		"operator_email", operatorEmail)
 	resp, err := onboardingService.RegisterDID(parsedDID, filecoinAddr, proofSetID, operatorEmail)
 	if err != nil {
-		fmt.Printf("DEBUG RegisterDID: Error from RegisterDID: %v\n", err)
+		log.Errorw("RegisterDID: Error from service.RegisterDID", "error", err)
 
 		if errors.Is(err, services.ErrIsNotAllowed) {
 			data.Error = fmt.Sprintf("DID '%s' is not authorized for onboarding", didStr)
@@ -182,7 +190,7 @@ func (h *WebHandler) RegisterDID(c echo.Context) error {
 	}
 
 	// Session creation was successful
-	fmt.Printf("DEBUG RegisterDID: Success! Created session ID: %s\n", resp.SessionID)
+	log.Debugw("RegisterDID: Success! Created session", "session_id", resp.SessionID)
 
 	// Save session ID to cookie
 	h.setSessionCookie(c, resp.SessionID)
@@ -190,14 +198,14 @@ func (h *WebHandler) RegisterDID(c echo.Context) error {
 	// Check if cookie was set
 	sess, err := session.Get("delegator_session", c)
 	if err != nil {
-		fmt.Printf("DEBUG RegisterDID: After set, error getting session: %v\n", err)
+		log.Errorw("RegisterDID: After set, error getting session", "error", err)
 	} else {
-		fmt.Printf("DEBUG RegisterDID: After set, session values: %+v\n", sess.Values)
+		log.Debugw("RegisterDID: After set, session values", "values", sess.Values)
 	}
 
 	// Success - redirect to step 2 with session
 	redirectURL := "/onboard?step=2"
-	fmt.Printf("DEBUG RegisterDID: Redirecting to: %s\n", redirectURL)
+	log.Debugw("RegisterDID: Redirecting", "url", redirectURL)
 	return c.Redirect(http.StatusSeeOther, redirectURL)
 }
 
@@ -208,24 +216,24 @@ func (h *WebHandler) RegisterFQDN(c echo.Context) error {
 	formSessionID := c.FormValue("session_id")
 
 	// Debug session ID sources
-	fmt.Printf("DEBUG RegisterFQDN: Cookie sessionID: %s, Form sessionID: %s\n", sessionID, formSessionID)
+	log.Debugw("RegisterFQDN: Session IDs", "cookie_session_id", sessionID, "form_session_id", formSessionID)
 
 	// Use form value if cookie is empty
 	if sessionID == "" && formSessionID != "" {
 		sessionID = formSessionID
-		fmt.Printf("DEBUG RegisterFQDN: Using form session ID: %s\n", sessionID)
+		log.Debugw("RegisterFQDN: Using form session ID", "session_id", sessionID)
 	}
 
 	// Log cookie contents
 	sess, err := session.Get("delegator_session", c)
 	if err != nil {
-		fmt.Printf("DEBUG RegisterFQDN: Error getting session cookie: %v\n", err)
+		log.Errorw("RegisterFQDN: Error getting session cookie", "error", err)
 	} else {
-		fmt.Printf("DEBUG RegisterFQDN: Session cookie values: %+v\n", sess.Values)
+		log.Debugw("RegisterFQDN: Session cookie values", "values", sess.Values)
 	}
 
 	urlStr := c.FormValue("url")
-	fmt.Printf("DEBUG RegisterFQDN: URL: %s\n", urlStr)
+	log.Debugw("RegisterFQDN: URL", "url", urlStr)
 
 	data := &OnboardingTemplateData{
 		TemplateData: &TemplateData{
@@ -241,12 +249,12 @@ func (h *WebHandler) RegisterFQDN(c echo.Context) error {
 
 	// Get session from storage
 	if sessionID != "" {
-		session, err := h.store.GetSession(sessionID)
+		session, err := h.sessionStore.GetSession(sessionID)
 		if err == nil {
 			data.Session = session
-			fmt.Printf("DEBUG RegisterFQDN: Found session in store: %+v\n", session)
+			log.Debugw("RegisterFQDN: Found session in store", "session", session)
 		} else {
-			fmt.Printf("DEBUG RegisterFQDN: Failed to get session from store: %v\n", err)
+			log.Errorw("RegisterFQDN: Failed to get session from store", "error", err)
 		}
 	}
 
@@ -276,23 +284,23 @@ func (h *WebHandler) RegisterFQDN(c echo.Context) error {
 	}
 
 	// Register FQDN
-	fmt.Printf("DEBUG RegisterFQDN: Calling service.RegisterFQDN with sessionID: %s, URL: %s\n", sessionID, parsedURL.String())
+	log.Debugw("RegisterFQDN: Calling service.RegisterFQDN", "session_id", sessionID, "url", parsedURL.String())
 	resp, err := onboardingService.RegisterFQDN(sessionID, *parsedURL)
 	if err != nil {
-		fmt.Printf("DEBUG RegisterFQDN: Error from RegisterFQDN: %v\n", err)
+		log.Errorw("RegisterFQDN: Error from RegisterFQDN", "error", err)
 
 		if errors.Is(err, services.ErrSessionNotFound) {
 			data.Error = "Session not found or expired"
 			// Retry with form session ID as a last resort if different
 			if formSessionID != "" && formSessionID != sessionID {
-				fmt.Printf("DEBUG RegisterFQDN: Retrying with form session ID: %s\n", formSessionID)
+				log.Debugw("RegisterFQDN: Retrying with form session ID", "session_id", formSessionID)
 				resp2, err2 := onboardingService.RegisterFQDN(formSessionID, *parsedURL)
 				if err2 == nil {
 					// Success with form session ID
 					h.setSessionCookie(c, resp2.SessionID)
 					return c.Redirect(http.StatusSeeOther, "/onboard?step=3")
 				}
-				fmt.Printf("DEBUG RegisterFQDN: Retry also failed: %v\n", err2)
+				log.Errorw("RegisterFQDN: Retry also failed", "error", err2)
 			}
 		} else if errors.Is(err, services.ErrInvalidSessionState) {
 			data.Error = "Invalid session state - please start over"
@@ -305,7 +313,7 @@ func (h *WebHandler) RegisterFQDN(c echo.Context) error {
 	}
 
 	// Save/update session ID in cookie
-	fmt.Printf("DEBUG RegisterFQDN: Success! Setting cookie with session ID: %s\n", resp.SessionID)
+	log.Debugw("RegisterFQDN: Success! Setting cookie with session ID", "session_id", resp.SessionID)
 	h.setSessionCookie(c, resp.SessionID)
 
 	// Success - redirect to step 3
@@ -336,7 +344,7 @@ func (h *WebHandler) RegisterProof(c echo.Context) error {
 
 	// Get session
 	if sessionID != "" {
-		session, err := h.store.GetSession(sessionID)
+		session, err := h.sessionStore.GetSession(sessionID)
 		if err == nil {
 			data.Session = session
 		}
@@ -404,7 +412,7 @@ func (h *WebHandler) SessionStatus(c echo.Context) error {
 	}
 
 	// Get session
-	session, err := h.store.GetSession(sessionID)
+	session, err := h.sessionStore.GetSession(sessionID)
 	if err != nil {
 		data.Error = "Session not found or expired"
 		return h.render(c, "status.html", data)
@@ -414,6 +422,74 @@ func (h *WebHandler) SessionStatus(c echo.Context) error {
 	data.NextStep = h.getNextStepFromStatus(session.Status)
 
 	return h.render(c, "status.html", data)
+}
+
+// SubmitProvider handles the final submission of the provider to the persistent store
+func (h *WebHandler) SubmitProvider(c echo.Context) error {
+	// Try to get session ID from cookie or form value
+	sessionID := h.getSessionID(c)
+	if sessionID == "" {
+		sessionID = c.FormValue("session_id")
+	}
+
+	data := &OnboardingTemplateData{
+		TemplateData: &TemplateData{
+			Title:     "WSP Onboarding",
+			SessionID: sessionID,
+		},
+		Step:      4,
+		HelpTexts: h.getHelpTexts(),
+	}
+
+	// Get session
+	if sessionID != "" {
+		session, err := h.sessionStore.GetSession(sessionID)
+		if err == nil {
+			data.Session = session
+			// Make sure step is 4 for proof verified status
+			if session.Status == models.StatusProofVerified {
+				data.Step = 4
+			}
+		} else {
+			data.Error = "Session not found or expired"
+			return h.render(c, "onboard.html", data)
+		}
+	} else {
+		data.Error = "Session ID is required"
+		return h.render(c, "onboard.html", data)
+	}
+
+	// Create onboarding service
+	onboardingService, err := h.createOnboardingService()
+	if err != nil {
+		data.Error = "Service configuration error"
+		return h.render(c, "onboard.html", data)
+	}
+
+	// Use the onboarding service to submit the provider
+	err = onboardingService.SubmitProvider(sessionID)
+	if err != nil {
+		if errors.Is(err, services.ErrSessionNotFound) {
+			data.Error = "Session not found or expired"
+		} else if errors.Is(err, services.ErrInvalidSessionState) {
+			data.Error = "Invalid session state - please start over"
+		} else {
+			data.Error = fmt.Sprintf("Failed to register provider: %v", err)
+		}
+		return h.render(c, "onboard.html", data)
+	}
+
+	// Get the updated session
+	updatedSession, err := h.sessionStore.GetSession(sessionID)
+	if err != nil {
+		data.Error = fmt.Sprintf("Failed to get updated session: %v", err)
+		return h.render(c, "onboard.html", data)
+	}
+
+	data.Session = updatedSession
+
+	// Success - redirect to the final completion page (step 5)
+	return c.Redirect(http.StatusSeeOther, "/onboard?step=5")
 }
 
 // GetDelegation serves the delegation file for download
@@ -454,7 +530,7 @@ func (h *WebHandler) GetDelegation(c echo.Context) error {
 // Helper methods
 
 func (h *WebHandler) createOnboardingService() (*services.OnboardingService, error) {
-	return services.NewOnboardingServiceFromConfig(h.store, h.config.Onboarding)
+	return services.NewOnboardingServiceFromConfig(h.sessionStore, h.persistedStore, h.config.Onboarding)
 }
 
 // SetHelpTexts allows overriding the default help texts
@@ -476,8 +552,10 @@ func (h *WebHandler) getStepFromStatus(status string) int {
 		return 2
 	case models.StatusFQDNVerified:
 		return 3
-	case models.StatusProofVerified, models.StatusCompleted:
+	case models.StatusProofVerified:
 		return 4
+	case models.StatusCompleted:
+		return 5
 	default:
 		return 1
 	}
@@ -489,7 +567,9 @@ func (h *WebHandler) getNextStepFromStatus(status string) string {
 		return "register-fqdn"
 	case models.StatusFQDNVerified:
 		return "register-proof"
-	case models.StatusProofVerified, models.StatusCompleted:
+	case models.StatusProofVerified:
+		return "submit-provider"
+	case models.StatusCompleted:
 		return "completed"
 	default:
 		return "register-did"

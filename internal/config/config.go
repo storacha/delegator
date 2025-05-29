@@ -13,6 +13,7 @@ type Config struct {
 	Server     ServerConfig     `mapstructure:"server"`
 	Onboarding OnboardingConfig `mapstructure:"onboarding"`
 	Log        LogConfig        `mapstructure:"log"`
+	Dynamo     DynamoConfig     `mapstructure:"dynamo"`
 }
 
 // ServerConfig holds server-specific configuration
@@ -29,16 +30,20 @@ type OnboardingConfig struct {
 	SessionTimeout          time.Duration `mapstructure:"session_timeout"`
 	DelegationTTL           time.Duration `mapstructure:"delegation_ttl"`
 	FQDNVerificationTimeout time.Duration `mapstructure:"fqdn_verification_timeout"`
-	MaxRetries              int           `mapstructure:"max_retries"`
 	IndexingServiceKey      string        `mapstructure:"indexing_service_key"`
 	UploadServiceKey        string        `mapstructure:"upload_service_key"`
-	AllowedDIDs             []string      `mapstructure:"allowed_dids"`
 	ServiceName             string        `mapstructure:"service_name"`
+	AllowList               []string      `mapstructure:"allow_list"`
 }
 
 // LogConfig holds logging configuration
 type LogConfig struct {
 	Level string `mapstructure:"level"`
+}
+
+type DynamoConfig struct {
+	Region   string `mapstructure:"region"`
+	Endpoint string `mapstructure:"endpoint"` // for development
 }
 
 // New creates a new viper instance with proper defaults and search paths
@@ -98,11 +103,15 @@ func setDefaults(v *viper.Viper) {
 
 	// Onboarding defaults
 	v.SetDefault("onboarding.session_timeout", 3600)
-	v.SetDefault("onboarding.delegation_ttl", 86400)
-	v.SetDefault("onboarding.fqdn_verification_timeout", 30)
+	v.SetDefault("onboarding.delegation_ttl", 60)
+	v.SetDefault("onboarding.fqdn_verification_timeout", 60)
 	v.SetDefault("onboarding.max_retries", 3)
 	v.SetDefault("onboarding.allowed_dids", []string{})
 	v.SetDefault("onboarding.service_name", "Storacha")
+	v.SetDefault("onboarding.allow_list", []string{"did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"})
+
+	v.SetDefault("dynamo.region", "us-west-1")
+	v.SetDefault("dynamo.endpoint", "")
 }
 
 func validate(config *Config) error {

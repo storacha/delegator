@@ -8,89 +8,47 @@
 </div>
 
 <div class="dashboard">
-    <div class="card-grid">
-        <div class="card">
-            <h2>🚀 Start Onboarding</h2>
-            <p>Begin the three-step process to register your WSP:</p>
-            <ol>
-                <li>Verify your DID (Decentralized Identifier)</li>
-                <li>Validate your FQDN endpoint</li>
-                <li>Submit delegation proof</li>
-            </ol>
-            <a href="/onboard" class="btn btn-primary">Start Onboarding Process</a>
-        </div>
-
-        <div class="card">
-            <h2>📊 Service Status</h2>
-            <div class="status-item">
-                <span class="status-label">Health:</span>
-                <span class="status-value status-{{if .Health.Healthy}}healthy{{else}}unhealthy{{end}}">
-                    {{if .Health.Healthy}}✅ Healthy{{else}}❌ Unhealthy{{end}}
-                </span>
-            </div>
-            <div class="status-item">
-                <span class="status-label">Uptime:</span>
-                <span class="status-value">{{.Health.Uptime}}</span>
-            </div>
-            <a href="/health" class="btn btn-secondary">View Details</a>
-        </div>
-
-        <div class="card">
-            <h2>🔍 Check Session</h2>
-            <p>Continue an existing onboarding session or check its status.</p>
-            <form action="/onboard/status" method="get" class="status-form">
-                <label for="session_id" class="form-label">Session ID:</label>
-                <div class="input-group">
-                    <input 
-                        type="text" 
-                        id="session_id" 
-                        name="session_id" 
-                        class="form-input"
-                        placeholder="Enter your session ID"
-                        required
-                        pattern="[a-fA-F0-9-]+"
-                        title="Session ID should contain only letters, numbers, and hyphens"
-                    >
-                    <button type="submit" class="btn btn-secondary">Check Status</button>
+    <div class="onboarding-panel">
+        <div class="onboarding-content">
+            <h2>Start Onboarding</h2>
+            <p>Begin the three-step process to register your Warm Storage Provider:</p>
+            <div class="onboarding-steps">
+                <div class="onboarding-step">
+                    <div class="step-icon">1</div>
+                    <div class="step-text">Verify your DID (Decentralized Identifier)</div>
                 </div>
-            </form>
-        </div>
-
-        {{if .Stats}}
-        <div class="card">
-            <h2>📈 Statistics</h2>
-            <div class="stats">
-                <div class="stat-item">
-                    <span class="stat-value">{{.Stats.TotalSessions}}</span>
-                    <span class="stat-label">Total Sessions</span>
+                <div class="onboarding-step">
+                    <div class="step-icon">2</div>
+                    <div class="step-text">Validate your FQDN endpoint</div>
                 </div>
-                <div class="stat-item">
-                    <span class="stat-value">{{.Stats.CompletedSessions}}</span>
-                    <span class="stat-label">Completed</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value">{{.Stats.ActiveProviders}}</span>
-                    <span class="stat-label">Active Providers</span>
+                <div class="onboarding-step">
+                    <div class="step-icon">3</div>
+                    <div class="step-text">Submit delegation proof</div>
                 </div>
             </div>
+            <div class="onboarding-action">
+                <a href="/onboard" class="btn btn-primary start-btn">Start Onboarding</a>
+            </div>
         </div>
-        {{end}}
     </div>
 </div>
 
-<div class="info-section">
-    <h2>About WSP Onboarding</h2>
-    <div class="info-grid">
-        <div class="info-item">
-            <h3>🔐 Secure Process</h3>
+<div class="features-section">
+    <h2>Why Choose Storacha Delegator</h2>
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon">🔐</div>
+            <h3>Secure Process</h3>
             <p>Multi-step verification ensures only authorized providers join the network.</p>
         </div>
-        <div class="info-item">
-            <h3>⚡ Fast & Reliable</h3>
+        <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>Fast & Reliable</h3>
             <p>Streamlined process with real-time status updates and clear instructions.</p>
         </div>
-        <div class="info-item">
-            <h3>🌐 Decentralized</h3>
+        <div class="feature-card">
+            <div class="feature-icon">🌐</div>
+            <h3>Decentralized</h3>
             <p>Built on DID standards and UCAN delegations for trustless verification.</p>
         </div>
     </div>

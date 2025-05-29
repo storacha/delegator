@@ -9,21 +9,22 @@
     {{block "head" .}}{{end}}
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
     <header class="header">
         <div class="container">
             <h1 class="logo">
-                <a href="/" aria-label="Storacha Delegator Home">🔥 Storacha Delegator</a>
+                <a href="/" aria-label="Storacha Delegator Home">🌶️ Storacha Delegator</a>
             </h1>
             <nav class="nav" role="navigation">
                 <a href="/" class="nav-link">Home</a>
                 <a href="/onboard{{if .SessionID}}?session_id={{.SessionID}}{{end}}" class="nav-link">Onboard</a>
-                <a href="/health" class="nav-link">Status</a>
                 {{if .SessionID}}<a href="/onboard/status/{{.SessionID}}" class="nav-link">My Session</a>{{end}}
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode">🌙</button>
             </nav>
         </div>
     </header>
 
-    <main class="main" role="main">
+    <main id="main-content" class="main" role="main">
         <div class="container">
             {{if .Flash}}
             <div class="flash flash-{{.Flash.Type}}" role="alert">
@@ -45,12 +46,12 @@
         <div class="container">
             <p>&copy; 2025 Storacha Network. Warm Storage Provider Onboarding Service.</p>
             <p>
-                <a href="https://github.com/storacha/delegator" target="_blank" rel="noopener">GitHub</a> |
-                <a href="/health">Service Health</a>
+                <a href="https://github.com/storacha/delegator" target="_blank" rel="noopener">GitHub</a>
             </p>
         </div>
     </footer>
 
     {{block "scripts" .}}{{end}}
+    <script src="/static/js/app.js"></script>
 </body>
 </html>

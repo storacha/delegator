@@ -9,6 +9,7 @@
         initClipboard();
         initFormEnhancements();
         initSessionManagement();
+        initDarkMode();
     });
 
     // Enhanced form validation
@@ -288,7 +289,6 @@
                 }
             });
         }
-    }
         
         // Add special handler for FQDN form submission 
         const fqdnForm = document.getElementById('fqdn-form');
@@ -365,6 +365,68 @@
                 }
             });
         });
+    }
+    
+    // Dark mode initialization and management
+    function initDarkMode() {
+        console.log("Initializing dark mode...");
+        
+        // Check for user preference
+        const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const savedTheme = localStorage.getItem('delegator-theme');
+        const themeToggle = document.getElementById('theme-toggle');
+        
+        console.log("Theme toggle element:", themeToggle);
+        console.log("Saved theme:", savedTheme);
+        console.log("System prefers dark mode:", prefersDarkMode);
+        
+        // Apply dark mode based on saved preference or system preference
+        if (savedTheme === 'dark' || (prefersDarkMode && !savedTheme)) {
+            document.documentElement.classList.add('dark-mode');
+            if (themeToggle) themeToggle.textContent = '☀️';
+            console.log("Applied dark mode");
+        }
+        
+        // Handle toggle button click
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log("Theme toggle clicked");
+                
+                document.documentElement.classList.toggle('dark-mode');
+                const isDarkMode = document.documentElement.classList.contains('dark-mode');
+                this.textContent = isDarkMode ? '☀️' : '🌙';
+                
+                // Save preference
+                localStorage.setItem(
+                    'delegator-theme', 
+                    isDarkMode ? 'dark' : 'light'
+                );
+                
+                console.log("Toggled to:", isDarkMode ? "dark" : "light", "mode");
+            });
+            
+            console.log("Added click listener to theme toggle");
+        } else {
+            console.warn("Theme toggle button not found!");
+        }
+        
+        // Listen for system preference changes
+        try {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+                if (!localStorage.getItem('delegator-theme')) {
+                    if (event.matches) {
+                        document.documentElement.classList.add('dark-mode');
+                        if (themeToggle) themeToggle.textContent = '☀️';
+                    } else {
+                        document.documentElement.classList.remove('dark-mode');
+                        if (themeToggle) themeToggle.textContent = '🌙';
+                    }
+                }
+            });
+        } catch (e) {
+            console.warn("Could not add media query listener:", e);
+        }
     }
 
 })();

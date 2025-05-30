@@ -3,7 +3,7 @@ server:
   port: 8080
   read_timeout: 1m
   write_timeout: 1m
-  session_key: "change-me-in-production-environment"
+  session_key: "frrist-w3infra-storage-provider"
 
 onboarding:
   session_timeout: 12h

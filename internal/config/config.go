@@ -168,6 +168,9 @@ func validate(config *Config) error {
 	if config.Server.SessionKey == "" {
 		errs = multierror.Append(errs, fmt.Errorf("server.session_key is required"))
 	}
+	if len(config.Server.SessionKey) != 32 {
+		errs = multierror.Append(errs, fmt.Errorf("server.session_key must be 32 bytes long"))
+	}
 
 	// Validate onboarding config
 	if config.Onboarding.IndexingServiceKey == "" {

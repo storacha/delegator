@@ -1,0 +1,56 @@
+{{define "content"}}
+<div class="hero">
+    <h1>Warm Storage Provider Onboarding</h1>
+    <p class="hero-description">
+        Welcome to the Storacha Delegator Service. Register your Warm Storage Provider (WSP) 
+        to join the Storacha network through secure multi-step verification.
+    </p>
+</div>
+
+<div class="dashboard">
+    <div class="onboarding-panel">
+        <div class="onboarding-content">
+            <h2>Start Onboarding</h2>
+            <p>Begin the three-step process to register your Warm Storage Provider:</p>
+            <div class="onboarding-steps">
+                <div class="onboarding-step">
+                    <div class="step-icon">1</div>
+                    <div class="step-text">Verify your DID (Decentralized Identifier)</div>
+                </div>
+                <div class="onboarding-step">
+                    <div class="step-icon">2</div>
+                    <div class="step-text">Validate your FQDN endpoint</div>
+                </div>
+                <div class="onboarding-step">
+                    <div class="step-icon">3</div>
+                    <div class="step-text">Submit delegation proof</div>
+                </div>
+            </div>
+            <div class="onboarding-action">
+                <a href="/onboard" class="btn btn-primary start-btn">Start Onboarding</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="features-section">
+    <h2>Why Choose Storacha Delegator</h2>
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon">🔐</div>
+            <h3>Secure Process</h3>
+            <p>Multi-step verification ensures only authorized providers join the network.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>Fast & Reliable</h3>
+            <p>Streamlined process with real-time status updates and clear instructions.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🌐</div>
+            <h3>Decentralized</h3>
+            <p>Built on DID standards and UCAN delegations for trustless verification.</p>
+        </div>
+    </div>
+</div>
+{{end}}

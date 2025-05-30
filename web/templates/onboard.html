@@ -1,0 +1,368 @@
+{{define "content"}}
+<div class="onboard-header">
+    <h1>WSP Onboarding Process</h1>
+    <div class="progress-bar">
+        <div class="progress-step {{if eq .Step 1}}active{{else if gt .Step 1}}completed{{end}}">
+            <span class="step-number">1</span>
+            <span class="step-label">DID Registration</span>
+        </div>
+        <div class="progress-step {{if eq .Step 2}}active{{else if gt .Step 2}}completed{{end}}">
+            <span class="step-number">2</span>
+            <span class="step-label">FQDN Verification</span>
+        </div>
+        <div class="progress-step {{if eq .Step 3}}active{{else if gt .Step 3}}completed{{end}}">
+            <span class="step-number">3</span>
+            <span class="step-label">Proof Submission</span>
+        </div>
+        <div class="progress-step {{if eq .Step 4}}active{{else if gt .Step 4}}completed{{end}}">
+            <span class="step-number">4</span>
+            <span class="step-label">Review</span>
+        </div>
+        <div class="progress-step {{if eq .Step 5}}active{{end}}">
+            <span class="step-number">5</span>
+            <span class="step-label">Complete</span>
+        </div>
+    </div>
+</div>
+
+{{if eq .Step 1}}
+<div class="onboard-step">
+    <div class="step-content">
+        <h2>Step 1: Register Your DID</h2>
+        <p>
+            Enter your DID (Decentralized Identifier) to begin the onboarding process. 
+            Your DID must be pre-authorized to join the Storacha network.
+        </p>
+        
+        <form action="/onboard/register-did" method="post" class="onboard-form">
+            <div class="form-group">
+                <label for="did" class="form-label">
+                    DID (Decentralized Identifier) *
+                </label>
+                <input 
+                    type="text" 
+                    id="did" 
+                    name="did" 
+                    class="form-input" 
+                    placeholder="did:key:..."
+                    value="{{.FormData.DID}}"
+                    required
+                    pattern="did:.*"
+                    title="DID must start with 'did:'"
+                >
+                <div class="form-help">
+                    Example: <code>did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e</code>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="filecoin_address" class="form-label">
+                    Filecoin Address *
+                </label>
+                <input 
+                    type="text" 
+                    id="filecoin_address" 
+                    name="filecoin_address" 
+                    class="form-input" 
+                    placeholder="f1..."
+                    value="{{.FormData.FilecoinAddress}}"
+                    required
+                >
+                <div class="form-help">
+                    Your Delegate Address (e.g., <code>0x7469B47e006D0660aB92AE560b27A1075EEcF97F</code>)
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="proof_set_id" class="form-label">
+                    Proof Set ID *
+                </label>
+                <input 
+                    type="number" 
+                    id="proof_set_id" 
+                    name="proof_set_id" 
+                    class="form-input" 
+                    placeholder="12345"
+                    value="{{.FormData.ProofSetID}}"
+                    required
+                    min="1"
+                >
+                <div class="form-help">
+                    Your Proof Set ID (a positive integer)
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="operator_email" class="form-label">
+                    Operator Email *
+                </label>
+                <input 
+                    type="email" 
+                    id="operator_email" 
+                    name="operator_email" 
+                    class="form-input" 
+                    placeholder="your.email@example.com"
+                    value="{{.FormData.OperatorEmail}}"
+                    required
+                >
+                <div class="form-help">
+                    Your contact email for operations-related communications
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Register DID</button>
+                <a href="/" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="step-help">
+        <h3>What is a DID?</h3>
+        <p>
+            A DID (Decentralized Identifier) is a unique identifier that you control. 
+            It's used to verify your identity without relying on centralized authorities.
+        </p>
+        <details>
+            <summary>{{.HelpTexts.DIDGeneration.Title}}</summary>
+            <p>
+                {{.HelpTexts.DIDGeneration.Description}}
+            </p>
+            {{if .HelpTexts.DIDGeneration.Command}}
+            <pre><code>{{.HelpTexts.DIDGeneration.Command}}</code></pre>
+            {{end}}
+        </details>
+    </div>
+</div>
+{{end}}
+
+{{if eq .Step 2}}
+<div class="onboard-step">
+    <div class="step-content">
+        <h2>Step 2: Verify Your FQDN</h2>
+        <p>
+            Your DID has been successfully registered! Now provide the FQDN (Fully Qualified Domain Name) 
+            where your storage node is accessible.
+        </p>
+        
+        {{if .Session}}
+        <div class="session-info">
+            <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
+            <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
+            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
+            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
+            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
+        </div>
+        {{end}}
+        
+        <form action="/onboard/register-fqdn" method="post" class="onboard-form" id="fqdn-form">
+            {{/* Use Session ID from various sources with priority */}}
+            <input type="hidden" id="session_id_input" name="session_id" value="{{if .Session}}{{.Session.SessionID}}{{else}}{{.SessionID}}{{end}}">
+            
+            <div class="form-group">
+                <label for="url" class="form-label">
+                    Storage Node URL *
+                </label>
+                <input 
+                    type="url" 
+                    id="url" 
+                    name="url" 
+                    class="form-input" 
+                    placeholder="https://your-storage-node.example.com"
+                    value="{{.FormData.URL}}"
+                    required
+                >
+                <div class="form-help">
+                    Enter the full URL where your storage node can be reached. It should respond with your DID.
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Verify FQDN</button>
+                <a href="/onboard/new" class="btn btn-secondary">Start Over</a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="step-help">
+        <h3>FQDN Verification</h3>
+        <p>
+            We'll make a request to your storage node URL to verify it's accessible 
+            and responds with your registered DID.
+        </p>
+        <details>
+            <summary>{{.HelpTexts.FQDNRequirements.Title}}</summary>
+            <p>
+                {{.HelpTexts.FQDNRequirements.Description}}
+            </p>
+            <ul>
+                <li>URL must be accessible over HTTPS</li>
+                <li>Should respond with your DID in the response body</li>
+                <li>Must be a valid domain name (no IP addresses)</li>
+            </ul>
+            {{if .HelpTexts.FQDNRequirements.Command}}
+            <pre><code>{{.HelpTexts.FQDNRequirements.Command}}</code></pre>
+            {{end}}
+        </details>
+    </div>
+</div>
+{{end}}
+
+{{if eq .Step 3}}
+<div class="onboard-step">
+    <div class="step-content">
+        <h2>Step 3: Submit Delegation Proof</h2>
+        <p>
+            Your FQDN has been verified! Now submit your delegation proof to complete the onboarding process.
+        </p>
+        
+        {{if .Session}}
+        <div class="session-info">
+            <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
+            <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
+            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
+            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
+            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
+            <p><strong>FQDN:</strong> <code>{{.Session.FQDN}}</code></p>
+        </div>
+        {{end}}
+        
+        <form action="/onboard/register-proof" method="post" class="onboard-form">
+            {{/* Use Session ID from various sources with priority */}}
+            <input type="hidden" name="session_id" value="{{if .Session}}{{.Session.SessionID}}{{else}}{{.SessionID}}{{end}}">
+            
+            <div class="form-group">
+                <label for="proof" class="form-label">
+                    Delegation Proof *
+                </label>
+                <textarea 
+                    id="proof" 
+                    name="proof" 
+                    class="form-textarea" 
+                    rows="10"
+                    placeholder="Paste your delegation proof here..."
+                    required
+                >{{.FormData.Proof}}</textarea>
+                <div class="form-help">
+                    Paste the delegation proof generated by your storage node. This should be a base64-encoded UCAN delegation.
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Submit Proof</button>
+                <a href="/onboard/new" class="btn btn-secondary">Start Over</a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="step-help">
+        <h3>Delegation Proof</h3>
+        <p>
+            The delegation proof is a cryptographic proof that you control the storage node 
+            and have the necessary permissions to provide storage services.
+        </p>
+        <details>
+            <summary>{{.HelpTexts.DelegationProof.Title}}</summary>
+            <p>
+                {{.HelpTexts.DelegationProof.Description}}
+            </p>
+            {{if .HelpTexts.DelegationProof.Command}}
+            <pre><code>{{.HelpTexts.DelegationProof.Command}}</code></pre>
+            {{end}}
+        </details>
+    </div>
+</div>
+{{end}}
+
+{{if eq .Step 4}}
+<div class="onboard-step">
+    <div class="step-content success">
+        <h2>Ready to Submit</h2>
+        <p>
+            Your information has been verified and is ready to be submitted to the network.
+            Please review the details below and click "Submit to Network" to finalize your registration.
+        </p>
+        
+        {{if .Session}}
+        <div class="session-info success">
+            <h3>Registration Details</h3>
+            <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
+            <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
+            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
+            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
+            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
+            <p><strong>FQDN:</strong> <code>{{.Session.FQDN}}</code></p>
+            <p><strong>Status:</strong> <span class="status-pending">⏱ Ready for Submission</span></p>
+            
+            {{if .Session.DelegationData}}
+            <div class="delegation-download">
+                <h4>Your Delegation</h4>
+                <p>Download your delegation file for your records:</p>
+                <a href="/onboard/delegation/{{.Session.SessionID}}" class="btn btn-secondary" download>
+                    📄 Download Delegation File
+                </a>
+            </div>
+            {{end}}
+        </div>
+        
+        <form action="/onboard/submit-provider" method="post" class="onboard-form">
+            <input type="hidden" name="session_id" value="{{if .Session}}{{.Session.SessionID}}{{else}}{{.SessionID}}{{end}}">
+            <div class="form-actions submission-actions">
+                <button type="submit" class="btn btn-success">Submit to Network</button>
+                <a href="/onboard/new" class="btn btn-secondary">Start Over</a>
+            </div>
+        </form>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{if eq .Step 5}}
+<div class="onboard-step">
+    <div class="step-content success">
+        <h2>🎉 Onboarding Complete!</h2>
+        <p>
+            Congratulations! Your Warm Storage Provider has been successfully registered 
+            with the Storacha network and is now active.
+        </p>
+        
+        {{if .Session}}
+        <div class="session-info success">
+            <h3>Registration Details</h3>
+            <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
+            <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
+            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
+            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
+            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
+            <p><strong>FQDN:</strong> <code>{{.Session.FQDN}}</code></p>
+            <p><strong>Status:</strong> <span class="status-completed">✅ {{.Session.Status}}</span></p>
+            
+            {{if .Session.DelegationData}}
+            <div class="delegation-download">
+                <h4>Your Delegation</h4>
+                <p>Download your delegation file for your records:</p>
+                <a href="/onboard/delegation/{{.Session.SessionID}}" class="btn btn-primary" download>
+                    📄 Download Delegation File
+                </a>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+        
+        <div class="next-steps">
+            <h3>What's Next?</h3>
+            <ul>
+                <li>Your storage node is now registered and can receive storage requests</li>
+                <li>Monitor your node's status and performance</li>
+                <li>Keep your delegation file secure - you may need it for future operations</li>
+            </ul>
+        </div>
+        
+        <div class="form-actions">
+            <a href="/" class="btn btn-primary">Return to Dashboard</a>
+            <a href="/onboard/new" class="btn btn-secondary">Register Another Node</a>
+        </div>
+    </div>
+</div>
+{{end}}
+{{end}}

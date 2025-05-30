@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  delegator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: 'dev'
+        COMMIT: 'local'
+        BUILD_TIME: '${BUILD_TIME:-now}'
+    ports:
+      - "8080:8080"
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+    volumes:
+      - ./docker-config.yaml:/app/config.yaml
+    environment:
+      - STORACHA_DELEGATOR_DYNAMO_ENDPOINT=http://dynamodb-local:8000
+      - STORACHA_DELEGATOR_DYNAMO_REGION=us-west-1
+      - STORACHA_DELEGATOR_DYNAMO_ALLOW_LIST_TABLE_NAME=delegator-allow-list
+      - STORACHA_DELEGATOR_DYNAMO_PROVIDER_INFO_TABLE_NAME=delegator-provider-info
+    networks:
+      - delegator-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: on-failure
+
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: dynamodb-local
+    command: "-jar DynamoDBLocal.jar -sharedDb"
+    ports:
+      - "8000:8000"
+    networks:
+      - delegator-network
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -I -w '%{http_code}' http://localhost:8000 | grep 400 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  dynamodb-setup:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.db-setup
+    networks:
+      - delegator-network
+    environment:
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - AWS_DEFAULT_REGION=us-west-1
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+    restart: on-failure:3
+
+networks:
+  delegator-network:
+    driver: bridge
+
+volumes:
+  dynamodb-data:

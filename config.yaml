@@ -1,0 +1,11 @@
+onboarding:
+  indexing_service_key: "MgCa5lObwi7YoN08khh0sVmK0cqv9wR9bUeJLz3osyYem3+0Bh5Ank+zu2EIeJ/Tpy2gdxMRmIJSBGIEl6FtMAsJwZzE="
+  upload_service_did: "did:key:z6Mktg7STK3Sh2x7F1NVNfctNG55hN7EG6cMhsdCKqFZ5rWz"
+  allowed_dids:
+    - "did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"
+dynamo:
+  region: "us-west-1"
+  endpoint: "http://localhost:8000"
+  allow_list_table_name: "frrist-delegator-allow_list"
+  provider_info_table_name: "frrist-w3infra-storage-provider"
+

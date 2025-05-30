@@ -31,30 +31,29 @@ var log = logging.Logger("service/onboarding")
 
 // OnboardingService handles WSP onboarding logic
 type OnboardingService struct {
-	sessionStore       storage.SessionStore
-	persistedStore     storage.PersistentStore
-	sessionTimeout     time.Duration
-	domainCheckTimeout time.Duration
-	delegationTTL      time.Duration
-	indexingService    ucan.Signer
-	uploadService      ucan.Signer
+	sessionStore          storage.SessionStore
+	persistedStore        storage.PersistentStore
+	sessionTimeout        time.Duration
+	domainCheckTimeout    time.Duration
+	indexingServiceSigner ucan.Signer
+	uploadServiceDID      did.DID
 }
 
 // NewOnboardingService creates a new onboarding service
 func NewOnboardingService(
 	sessionStore storage.SessionStore,
 	persistedStore storage.PersistentStore,
-	sessionTimeout, delegationTTL, domainCheckTimeout time.Duration,
-	indexingService, uploadService ucan.Signer,
+	sessionTimeout, domainCheckTimeout time.Duration,
+	indexingServiceSigner ucan.Signer,
+	uploadServiceDID did.DID,
 ) *OnboardingService {
 	return &OnboardingService{
-		sessionStore:       sessionStore,
-		persistedStore:     persistedStore,
-		sessionTimeout:     sessionTimeout,
-		delegationTTL:      delegationTTL,
-		domainCheckTimeout: domainCheckTimeout,
-		indexingService:    indexingService,
-		uploadService:      uploadService,
+		sessionStore:          sessionStore,
+		persistedStore:        persistedStore,
+		sessionTimeout:        sessionTimeout,
+		domainCheckTimeout:    domainCheckTimeout,
+		indexingServiceSigner: indexingServiceSigner,
+		uploadServiceDID:      uploadServiceDID,
 	}
 }
 
@@ -185,23 +184,23 @@ func (s *OnboardingService) RegisterFQDN(sessionID string, fqdnURL url.URL) (*mo
 		return nil, ErrSessionNotFound
 	}
 
-	log.Debugw("Found session for FQDN registration", 
-		"session_id", session.SessionID, 
-		"did", session.DID, 
-		"status", session.Status, 
+	log.Debugw("Found session for FQDN registration",
+		"session_id", session.SessionID,
+		"did", session.DID,
+		"status", session.Status,
 		"expires_at", session.ExpiresAt)
 
 	// Check if session has expired
 	if time.Now().After(session.ExpiresAt) {
-		log.Debugw("Session expired", 
-			"session_id", session.SessionID, 
+		log.Debugw("Session expired",
+			"session_id", session.SessionID,
 			"expired_at", session.ExpiresAt.Format(time.RFC3339))
 		return nil, fmt.Errorf("%w: session expired", ErrInvalidSessionState)
 	}
 
 	// Check if session is in the correct state (should be DID verified)
 	if session.Status != models.StatusDIDVerified {
-		log.Debugw("Wrong session state for FQDN registration", 
+		log.Debugw("Wrong session state for FQDN registration",
 			"session_id", session.SessionID,
 			"expected_status", models.StatusDIDVerified,
 			"actual_status", session.Status)
@@ -385,7 +384,7 @@ func (s *OnboardingService) verifyFQDNReturnsCorrectDID(fqdnURL url.URL, expecte
 
 // generateDelegation generates a delegation for the provider (stubbed)
 func (s *OnboardingService) generateDelegation(strgDID ucan.Principal) (string, error) {
-	indxToStrgDelegation, err := delegation.DelegateIndexingToStorage(s.indexingService, strgDID)
+	indxToStrgDelegation, err := delegation.DelegateIndexingToStorage(s.indexingServiceSigner, strgDID)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate delegation from indexing service to storage node: %w", err)
 	}
@@ -414,8 +413,8 @@ func (s *OnboardingService) validateProof(proof string, providerDID string) erro
 	if strgDelegation.Issuer != providerDID {
 		return fmt.Errorf("delegation issuer (%s) does not match provider DID (%s)", strgDelegation.Issuer, providerDID)
 	}
-	if strgDelegation.Audience != s.uploadService.DID().String() {
-		return fmt.Errorf("delegation audience (%s) does not match upload service DID (%s)", strgDelegation.Audience, s.uploadService.DID())
+	if strgDelegation.Audience != s.uploadServiceDID.DID().String() {
+		return fmt.Errorf("delegation audience (%s) does not match upload service DID (%s)", strgDelegation.Audience, s.uploadServiceDID.DID())
 	}
 	var expectedCapabilities = map[string]struct{}{
 		blob.AcceptAbility:      {},
@@ -531,18 +530,15 @@ func (s *OnboardingService) getNextStep(status string) string {
 
 // NewOnboardingServiceFromConfig creates a new onboarding service from config
 func NewOnboardingServiceFromConfig(sessionStore storage.SessionStore, persistedStore storage.PersistentStore, cfg config.OnboardingConfig) (*OnboardingService, error) {
-	sessionTimeout := cfg.SessionTimeout * time.Second
-	delegationTTL := cfg.DelegationTTL * time.Second
-	fqdnTimeout := cfg.FQDNVerificationTimeout * time.Second
 
 	indexingService, err := ed25519.Parse(cfg.IndexingServiceKey)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing configured indexing service: %w", err)
 	}
-	uploadService, err := ed25519.Parse(cfg.UploadServiceKey)
+	uploadDID, err := did.Parse(cfg.UploadServiceDID)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing configured upload service: %w", err)
 	}
 
-	return NewOnboardingService(sessionStore, persistedStore, sessionTimeout, delegationTTL, fqdnTimeout, indexingService, uploadService), nil
+	return NewOnboardingService(sessionStore, persistedStore, cfg.SessionTimeout, cfg.FQDNVerificationTimeout, indexingService, uploadDID), nil
 }

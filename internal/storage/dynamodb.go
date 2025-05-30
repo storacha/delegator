@@ -15,23 +15,13 @@ import (
 	"github.com/storacha/delegator/internal/models"
 )
 
-const (
-	// Table names
-	allowlistTableName    = "delegator_allowlist"
-	providerInfoTableName = "delegator_provider_info"
-)
-
 // DynamoDBStore provides storage via AWS DynamoDB
 type DynamoDBStore struct {
-	db          *dynamodb.Client
-	initialized bool
-	ctx         context.Context
-}
-
-// DynamoDBConfig contains configuration for the DynamoDB store
-type DynamoDBConfig struct {
-	Region   string
-	Endpoint string // Optional, for local development
+	db                    *dynamodb.Client
+	initialized           bool
+	ctx                   context.Context
+	allowListTableName    string
+	providerInfoTableName string
 }
 
 // NewDynamoDBStore creates a new DynamoDB-backed store
@@ -72,16 +62,18 @@ func NewDynamoDBStore(config config.DynamoConfig) (*DynamoDBStore, error) {
 
 	// Create store
 	store := &DynamoDBStore{
-		db:          client,
-		initialized: false,
-		ctx:         ctx,
+		db:                    client,
+		initialized:           false,
+		ctx:                   ctx,
+		allowListTableName:    config.AllowListTableName,
+		providerInfoTableName: config.ProviderInfoTableName,
 	}
 
-	return store, nil
+	return store, store.initialize(config)
 }
 
 // Initialize creates tables if they don't exist
-func (d *DynamoDBStore) Initialize() error {
+func (d *DynamoDBStore) initialize(cfg config.DynamoConfig) error {
 	if d.initialized {
 		return nil
 	}
@@ -93,7 +85,7 @@ func (d *DynamoDBStore) Initialize() error {
 		indexes    []types.GlobalSecondaryIndex
 	}{
 		{
-			name: allowlistTableName,
+			name: cfg.AllowListTableName,
 			keySchema: []types.KeySchemaElement{
 				{
 					AttributeName: aws.String("did"),
@@ -108,7 +100,7 @@ func (d *DynamoDBStore) Initialize() error {
 			},
 		},
 		{
-			name: providerInfoTableName,
+			name: cfg.ProviderInfoTableName,
 			keySchema: []types.KeySchemaElement{
 				{
 					AttributeName: aws.String("provider"),
@@ -160,8 +152,8 @@ func (d *DynamoDBStore) Initialize() error {
 	}
 
 	d.initialized = true
-	log.Infow("DynamoDB store initialized", 
-		"region", d.db.Options().Region, 
+	log.Infow("DynamoDB store initialized",
+		"region", d.db.Options().Region,
 		"endpoint", d.db.Options().EndpointResolver)
 	return nil
 }
@@ -169,7 +161,7 @@ func (d *DynamoDBStore) Initialize() error {
 // IsAllowedDID checks if a DID is allowed for onboarding (implements PersistentStore interface)
 func (d *DynamoDBStore) IsAllowedDID(did string) (bool, error) {
 	input := &dynamodb.GetItemInput{
-		TableName: aws.String(allowlistTableName),
+		TableName: aws.String(d.allowListTableName),
 		Key: map[string]types.AttributeValue{
 			"did": &types.AttributeValueMemberS{Value: did},
 		},
@@ -196,7 +188,7 @@ func (d *DynamoDBStore) AddAllowedDID(did string) error {
 	}
 
 	input := &dynamodb.PutItemInput{
-		TableName: aws.String(allowlistTableName),
+		TableName: aws.String(d.allowListTableName),
 		Item:      item,
 	}
 
@@ -212,7 +204,7 @@ func (d *DynamoDBStore) AddAllowedDID(did string) error {
 // IsRegisteredDID checks if a DID is registered as a provider (implements PersistentStore interface)
 func (d *DynamoDBStore) IsRegisteredDID(did string) (bool, error) {
 	input := &dynamodb.GetItemInput{
-		TableName: aws.String(providerInfoTableName),
+		TableName: aws.String(d.providerInfoTableName),
 		Key: map[string]types.AttributeValue{
 			"provider": &types.AttributeValueMemberS{Value: did},
 		},
@@ -235,8 +227,8 @@ func (d *DynamoDBStore) RegisterProvider(info *models.StorageProviderInfo) error
 	info.UpdatedAt = now
 
 	// Log info for debugging
-	log.Infow("Registering provider", 
-		"did", info.Provider, 
+	log.Infow("Registering provider",
+		"did", info.Provider,
 		"endpoint", info.Endpoint)
 
 	// Manually create the item map to ensure all required fields are properly set
@@ -269,7 +261,7 @@ func (d *DynamoDBStore) RegisterProvider(info *models.StorageProviderInfo) error
 	item["updated_at"] = &types.AttributeValueMemberS{Value: info.UpdatedAt.Format(time.RFC3339)}
 
 	input := &dynamodb.PutItemInput{
-		TableName: aws.String(providerInfoTableName),
+		TableName: aws.String(d.providerInfoTableName),
 		Item:      item,
 	}
 

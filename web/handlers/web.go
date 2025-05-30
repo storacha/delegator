@@ -12,7 +12,7 @@ import (
 	logging "github.com/ipfs/go-log"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
-	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
+	"github.com/storacha/go-ucanto/did"
 
 	"github.com/storacha/delegator/internal/config"
 	"github.com/storacha/delegator/internal/models"
@@ -44,14 +44,13 @@ func NewWebHandler(templatesDir string, sessionStore storage.SessionStore, persi
 		return nil, err
 	}
 
-	uploadPrincipal, err := ed25519.Parse(cfg.Onboarding.UploadServiceKey)
+	uploadDID, err := did.Parse(cfg.Onboarding.UploadServiceDID)
 	if err != nil {
 		return nil, fmt.Errorf("DEVELOPER ERROR: failed to parse indexing service key: %w", err)
 	}
 	// Generate help texts with configuration values
 	configMap := map[string]interface{}{
-		"ServiceName": cfg.Onboarding.ServiceName,
-		"ServiceDid":  uploadPrincipal.DID().String(),
+		"ServiceDid": uploadDID.String(),
 	}
 
 	// Add more dynamic values from config if needed
@@ -279,8 +278,10 @@ func NewTemplateRenderer(templatesDir string) (*TemplateRenderer, error) {
 	// Get list of page templates
 	pageTemplates, err := filepath.Glob(filepath.Join(templatesDir, "*.html"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to glob templates: %w", err)
 	}
+	
+	fmt.Printf("Found %d templates in %s: %v\n", len(pageTemplates), templatesDir, pageTemplates)
 
 	// For each page template, parse it with the base template
 	for _, page := range pageTemplates {

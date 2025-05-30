@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/sessions"
 	logging "github.com/ipfs/go-log"
@@ -37,9 +36,6 @@ func New(cfg *config.Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := dynamoStore.Initialize(); err != nil {
-		return nil, err
-	}
 	if len(cfg.Onboarding.AllowList) > 0 {
 		if err := dynamoStore.AddAllowedDID(cfg.Onboarding.AllowList[0]); err != nil {
 			return nil, err
@@ -70,11 +66,10 @@ func New(cfg *config.Config) (*Server, error) {
 	// Log debug message about session configuration
 	log.Debugw("Session middleware configured", "key_length", len(cfg.Server.SessionKey))
 
-	// Configure server timeouts - convert seconds to proper time.Duration
-	e.Server.ReadTimeout = cfg.Server.ReadTimeout * time.Second
-	e.Server.ReadHeaderTimeout = cfg.Server.ReadTimeout * time.Second
-	e.Server.IdleTimeout = cfg.Server.ReadTimeout * time.Second
-	e.Server.WriteTimeout = cfg.Server.WriteTimeout * time.Second
+	e.Server.ReadTimeout = cfg.Server.ReadTimeout
+	e.Server.ReadHeaderTimeout = cfg.Server.ReadTimeout
+	e.Server.IdleTimeout = cfg.Server.ReadTimeout
+	e.Server.WriteTimeout = cfg.Server.WriteTimeout
 
 	// Initialize API routes
 	sessionStore := storage.NewMemoryStore()

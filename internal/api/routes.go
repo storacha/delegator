@@ -31,6 +31,8 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, sessionStore storage.Sessi
 
 	// Try to set up web UI - if templates are available
 	templatesDir := filepath.Join("web", "templates")
+	// Log templates directory path for debugging
+	fmt.Printf("Looking for templates in: %s\n", templatesDir)
 	renderer, err := handlers.NewTemplateRenderer(templatesDir)
 	if err == nil {
 		e.Renderer = renderer

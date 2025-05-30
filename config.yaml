@@ -1,30 +1,11 @@
-# Delegator Service Configuration
-
-server:
-  host: 0.0.0.0
-  port: 8080
-  read_timeout: 30
-  write_timeout: 30
-
-log:
-  level: info
-  format: console
-
 onboarding:
-  session_timeout: 3600  # 1 hour in seconds
-  delegation_ttl: 86400  # 24 hours in seconds
-  fqdn_verification_timeout: 30  # 30 seconds
-  max_retries: 3
   indexing_service_key: "MgCa5lObwi7YoN08khh0sVmK0cqv9wR9bUeJLz3osyYem3+0Bh5Ank+zu2EIeJ/Tpy2gdxMRmIJSBGIEl6FtMAsJwZzE="
-  upload_service_key: "MgCbeqcVqMcLs/4a7nKvHwcQLAggz+gZNDFykd9mXINLtY+0Buvk0hCp2CxihinQmNocYu+Q495YWgafn582g3UOJ93A="
+  upload_service_did: "did:key:z6Mktg7STK3Sh2x7F1NVNfctNG55hN7EG6cMhsdCKqFZ5rWz"
   allowed_dids:
     - "did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"
-  service_name: "Storacha"
-  help_text_settings:
-    service_did: "did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"
-    extra_capabilities: "store/get store/list"
-    node_config_options: "--auto-respond --timeout 30"
-    did_flags: "--output-key --output-format=jwk"
 dynamo:
+  region: "us-west-1"
   endpoint: "http://localhost:8000"
+  allow_list_table_name: "frrist-delegator-allow_list"
+  provider_info_table_name: "frrist-w3infra-storage-provider"
 

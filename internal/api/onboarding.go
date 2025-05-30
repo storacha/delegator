@@ -3,9 +3,10 @@ package api
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
-	"time"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/storacha/go-ucanto/did"
@@ -24,20 +25,23 @@ type OnboardingHandler struct {
 
 // NewOnboardingHandler creates a new onboarding handler
 func NewOnboardingHandler(sessionStore storage.SessionStore, persistedStore storage.PersistentStore, cfg config.OnboardingConfig) (*OnboardingHandler, error) {
-	sessionTimeout := cfg.SessionTimeout * time.Second
-	delegationTTL := cfg.DelegationTTL * time.Second
-	fqdnTimeout := cfg.FQDNVerificationTimeout * time.Second
-
-	indexingService, err := ed25519.Parse(cfg.IndexingServiceKey)
+	indexingServiceKey, err := ed25519.Parse(cfg.IndexingServiceKey)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing configured indexing service: %w", err)
 	}
-	uploadService, err := ed25519.Parse(cfg.UploadServiceKey)
+	uploadServiceDID, err := did.Parse(cfg.UploadServiceDID)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing configured upload service: %w", err)
 	}
 
-	service := services.NewOnboardingService(sessionStore, persistedStore, sessionTimeout, delegationTTL, fqdnTimeout, indexingService, uploadService)
+	service := services.NewOnboardingService(
+		sessionStore,
+		persistedStore,
+		cfg.SessionTimeout,
+		cfg.FQDNVerificationTimeout,
+		indexingServiceKey,
+		uploadServiceDID,
+	)
 
 	return &OnboardingHandler{
 		service: service,
@@ -51,27 +55,22 @@ func (h *OnboardingHandler) validateURL(rawURL string) (*url.URL, error) {
 		return nil, fmt.Errorf("URL is invalid: %w", err)
 	}
 
-	/*
-		if parsedURL.Scheme != "https" {
-			return nil, fmt.Errorf("URL scheme is invalid: %s. Must be https", parsedURL.Scheme)
-		}
-	*/
+	if parsedURL.Scheme != "https" {
+		return nil, fmt.Errorf("URL scheme is invalid: %s. Must be https", parsedURL.Scheme)
+	}
 	if parsedURL.Host == "" {
 		return nil, fmt.Errorf("URL must have a host")
 	}
 
-	/*
-			// Check for port in the host
-			if strings.Contains(parsedURL.Host, ":") {
-				return nil, fmt.Errorf("URL must not contain a port")
-			}
+	// Check for port in the host
+	if strings.Contains(parsedURL.Host, ":") {
+		return nil, fmt.Errorf("URL must not contain a port")
+	}
 
-
-		// Check if host is an IP address
-		if net.ParseIP(parsedURL.Host) != nil {
-			return nil, fmt.Errorf("URL must use a domain name, not an IP address")
-		}
-	*/
+	// Check if host is an IP address
+	if net.ParseIP(parsedURL.Host) != nil {
+		return nil, fmt.Errorf("URL must use a domain name, not an IP address")
+	}
 
 	return parsedURL, nil
 }
@@ -409,7 +408,7 @@ func (h *OnboardingHandler) submitProvider(c echo.Context) error {
 				Code:    http.StatusBadRequest,
 			})
 		}
-		
+
 		// For any other errors
 		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "registration_failed",

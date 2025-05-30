@@ -42,8 +42,18 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /app/delegator .
 
-# Copy configuration file
-COPY config.yaml .
+# Create directories for web assets
+RUN mkdir -p ./web/templates ./web/static
+
+# Copy web templates
+COPY --from=builder /app/web/templates/ ./web/templates/
+COPY --from=builder /app/web/static/ ./web/static/
+
+# For debugging
+RUN ls -la ./web/templates/
+RUN ls -la ./web/static/
+
+# Configuration file will be mounted via docker-compose volume
 
 # Change ownership to non-root user
 RUN chown -R delegator:delegator /app

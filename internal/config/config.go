@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/viper"
 )
 
@@ -27,22 +28,37 @@ type ServerConfig struct {
 
 // OnboardingConfig holds onboarding-specific configuration
 type OnboardingConfig struct {
-	SessionTimeout          time.Duration `mapstructure:"session_timeout"`
-	DelegationTTL           time.Duration `mapstructure:"delegation_ttl"`
+	// SessionTimeout is the duration a session will remain active for
+	SessionTimeout time.Duration `mapstructure:"session_timeout"`
+	// FQDNVerificationTimeout is the duration we'll wait when dialing the operators domain
 	FQDNVerificationTimeout time.Duration `mapstructure:"fqdn_verification_timeout"`
-	IndexingServiceKey      string        `mapstructure:"indexing_service_key"`
-	UploadServiceKey        string        `mapstructure:"upload_service_key"`
-	ServiceName             string        `mapstructure:"service_name"`
-	AllowList               []string      `mapstructure:"allow_list"`
+	// The Private Key of the indexing service used to sign delegations for the storage node.
+	IndexingServiceKey string `mapstructure:"indexing_service_key"`
+	// The UploadServiceDID used for instruction to operator when creating a delegation for the upload to storage node.
+	UploadServiceDID string `mapstructure:"upload_service_did"`
+	// AllowList is a list of DID's that are allowed to register. DID's may also be placed in to the AllowListTable of dynamo
+	// Note: setting this value will cause a write to the dynamo table AllowListTableName when application starts.
+	AllowList []string `mapstructure:"allow_list"`
 }
 
 // LogConfig holds logging configuration
 type LogConfig struct {
+	// Level is a log level, one of: debug, info, warn, error
 	Level string `mapstructure:"level"`
 }
 
 type DynamoConfig struct {
-	Region   string `mapstructure:"region"`
+	// Region of the dynamoDB instance
+	Region string `mapstructure:"region"`
+	// Name of table we use for allowing users to register
+	AllowListTableName string `mapstructure:"allow_list_table_name"`
+	// Name of table we persist registered user data to
+	ProviderInfoTableName string `mapstructure:"provider_info_table_name"`
+
+	// Endpoint may be set for local testing, usually with docker, e.g.
+	// docker run -p 8000:8000 amazon/dynamodb-local -jar DynamoDBLocal.jar -sharedDb
+	// then set endpoint to localhost:8080
+	// Do not set for production.
 	Endpoint string `mapstructure:"endpoint"` // for development
 }
 
@@ -53,6 +69,7 @@ func New() *viper.Viper {
 	// Set config file properties
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
+	// directories to look for a config file in
 	v.AddConfigPath(".")
 	v.AddConfigPath("./configs")
 	v.AddConfigPath("$HOME/.delegator")
@@ -61,7 +78,8 @@ func New() *viper.Viper {
 	// Environment variable support
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	v.SetEnvPrefix("DELEGATOR")
+	// prefix of env vars
+	v.SetEnvPrefix("STORACHA_DELEGATOR")
 
 	// Set defaults
 	setDefaults(v)
@@ -90,34 +108,101 @@ func Load(v *viper.Viper) (*Config, error) {
 	return &config, nil
 }
 
+var Default = Config{
+	Server: ServerConfig{
+		Host:         "0.0.0.0",
+		Port:         8080,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
+		SessionKey:   "storacha-delegator-secret-key",
+	},
+	Onboarding: OnboardingConfig{
+		SessionTimeout:          12 * time.Hour,
+		FQDNVerificationTimeout: time.Minute,
+		IndexingServiceKey:      "",         // required during runtime
+		AllowList:               []string{}, // usually empty, candidates may be manually added to the AllowListTableName table
+	},
+	Log: LogConfig{
+		Level: "info",
+	},
+	Dynamo: DynamoConfig{
+		Region:                "", // required
+		AllowListTableName:    "", // required
+		ProviderInfoTableName: "", // required
+		Endpoint:              "", // only used in testing
+	},
+}
+
 func setDefaults(v *viper.Viper) {
 	// Server defaults
-	v.SetDefault("server.host", "localhost")
-	v.SetDefault("server.port", 8080)
-	v.SetDefault("server.read_timeout", 30)
-	v.SetDefault("server.write_timeout", 30)
-	v.SetDefault("server.session_key", "storacha-delegator-secret-key")
+	v.SetDefault("server.host", Default.Server.Host)
+	v.SetDefault("server.port", Default.Server.Port)
+	v.SetDefault("server.read_timeout", Default.Server.ReadTimeout)
+	v.SetDefault("server.write_timeout", Default.Server.WriteTimeout)
+	v.SetDefault("server.session_key", Default.Server.SessionKey)
 
 	// Log defaults
-	v.SetDefault("log.level", "info")
+	v.SetDefault("log.level", Default.Log.Level)
 
 	// Onboarding defaults
-	v.SetDefault("onboarding.session_timeout", 3600)
-	v.SetDefault("onboarding.delegation_ttl", 60)
-	v.SetDefault("onboarding.fqdn_verification_timeout", 60)
-	v.SetDefault("onboarding.max_retries", 3)
-	v.SetDefault("onboarding.allowed_dids", []string{})
-	v.SetDefault("onboarding.service_name", "Storacha")
-	v.SetDefault("onboarding.allow_list", []string{"did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"})
+	v.SetDefault("onboarding.session_timeout", Default.Onboarding.SessionTimeout)
+	v.SetDefault("onboarding.fqdn_verification_timeout", Default.Onboarding.FQDNVerificationTimeout)
+	v.SetDefault("onboarding.indexing_service_key", Default.Onboarding.IndexingServiceKey)
+	v.SetDefault("onboarding.allow_list", Default.Onboarding.AllowList)
 
-	v.SetDefault("dynamo.region", "us-west-1")
-	v.SetDefault("dynamo.endpoint", "")
+	// Dynamo defaults
+	v.SetDefault("dynamo.region", Default.Dynamo.Region)
+	v.SetDefault("dynamo.allow_list_table_name", Default.Dynamo.Endpoint)
+	v.SetDefault("dynamo.provider_info_table_name", Default.Dynamo.Endpoint)
+	v.SetDefault("dynamo.endpoint", Default.Dynamo.Endpoint)
 }
 
 func validate(config *Config) error {
+	// return a multierror in the event many validations fail
+	var errs error
+	// Validate server config
 	if config.Server.Port < 1 || config.Server.Port > 65535 {
-		return fmt.Errorf("invalid server port: %d", config.Server.Port)
+		errs = multierror.Append(errs, fmt.Errorf("invalid server port: %d", config.Server.Port))
 	}
 
-	return nil
+	if config.Server.SessionKey == "" {
+		errs = multierror.Append(errs, fmt.Errorf("server.session_key is required"))
+	}
+
+	// Validate onboarding config
+	if config.Onboarding.IndexingServiceKey == "" {
+		errs = multierror.Append(errs, fmt.Errorf("onboarding.indexing_service_key is required"))
+	}
+
+	if config.Onboarding.UploadServiceDID == "" {
+		errs = multierror.Append(errs, fmt.Errorf("onboarding.upload_service_did is required"))
+	}
+
+	// Validate log config
+	validLogLevels := []string{"debug", "info", "warn", "error"}
+	isValidLogLevel := false
+	for _, level := range validLogLevels {
+		if strings.ToLower(config.Log.Level) == level {
+			isValidLogLevel = true
+			break
+		}
+	}
+	if !isValidLogLevel {
+		errs = multierror.Append(errs, fmt.Errorf("invalid log level: %s, must be one of: debug, info, warn, error", config.Log.Level))
+	}
+
+	// Validate dynamo config
+	if config.Dynamo.Region == "" {
+		errs = multierror.Append(errs, fmt.Errorf("dynamo.region is required"))
+	}
+
+	if config.Dynamo.AllowListTableName == "" {
+		errs = multierror.Append(errs, fmt.Errorf("dynamo.allow_list_table_name is required"))
+	}
+
+	if config.Dynamo.ProviderInfoTableName == "" {
+		errs = multierror.Append(errs, fmt.Errorf("dynamo.provider_info_table_name is required"))
+	}
+
+	return errs
 }

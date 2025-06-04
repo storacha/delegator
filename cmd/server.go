@@ -27,6 +27,7 @@ func init() {
 	// Server-specific flags
 	serverCmd.Flags().String("host", "localhost", "server host")
 	serverCmd.Flags().Int("port", 8080, "server port")
+	serverCmd.Flags().String("key-file", "", "PEM file containing private key of delegator")
 }
 
 func runServer(cmd *cobra.Command, args []string) error {
@@ -40,6 +41,11 @@ func runServer(cmd *cobra.Command, args []string) error {
 	if cmd.Flags().Changed("port") {
 		port, _ := cmd.Flags().GetInt("port")
 		config.Server.Port = port
+	}
+
+	if cmd.Flags().Changed("key-file") {
+		keyFilePath, _ := cmd.Flags().GetString("key-file")
+		config.Onboarding.KeyFilePath = keyFilePath
 	}
 
 	// Create server instance

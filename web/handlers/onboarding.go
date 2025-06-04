@@ -12,7 +12,7 @@ import (
 	"github.com/storacha/go-ucanto/did"
 
 	"github.com/storacha/delegator/internal/models"
-	"github.com/storacha/delegator/internal/services"
+	"github.com/storacha/delegator/internal/onboarding"
 )
 
 // Note: We already have a logger in web.go as log = logging.Logger("web")
@@ -162,26 +162,19 @@ func (h *WebHandler) RegisterDID(c echo.Context) error {
 		return h.render(c, "onboard.html", data)
 	}
 
-	// Create onboarding service
-	onboardingService, err := h.createOnboardingService()
-	if err != nil {
-		data.Error = "Service configuration error"
-		return h.render(c, "onboard.html", data)
-	}
-
 	// Register DID
 	log.Debugw("RegisterDID: Calling service.RegisterDID",
 		"did", parsedDID.String(),
 		"filecoin_address", filecoinAddr,
 		"proof_set_id", proofSetID,
 		"operator_email", operatorEmail)
-	resp, err := onboardingService.RegisterDID(parsedDID, filecoinAddr, proofSetID, operatorEmail)
+	resp, err := h.service.RegisterDID(parsedDID, filecoinAddr, proofSetID, operatorEmail)
 	if err != nil {
 		log.Errorw("RegisterDID: Error from service.RegisterDID", "error", err)
 
-		if errors.Is(err, services.ErrIsNotAllowed) {
+		if errors.Is(err, onboarding.ErrIsNotAllowed) {
 			data.Error = fmt.Sprintf("DID '%s' is not authorized for onboarding", didStr)
-		} else if errors.Is(err, services.ErrIsAlreadyRegistered) {
+		} else if errors.Is(err, onboarding.ErrIsAlreadyRegistered) {
 			data.Error = fmt.Sprintf("DID '%s' is already registered", didStr)
 		} else {
 			data.Error = fmt.Sprintf("Registration failed: %v", err)
@@ -276,25 +269,18 @@ func (h *WebHandler) RegisterFQDN(c echo.Context) error {
 		return h.render(c, "onboard.html", data)
 	}
 
-	// Create onboarding service
-	onboardingService, err := h.createOnboardingService()
-	if err != nil {
-		data.Error = "Service configuration error"
-		return h.render(c, "onboard.html", data)
-	}
-
 	// Register FQDN
 	log.Debugw("RegisterFQDN: Calling service.RegisterFQDN", "session_id", sessionID, "url", parsedURL.String())
-	resp, err := onboardingService.RegisterFQDN(sessionID, *parsedURL)
+	resp, err := h.service.RegisterFQDN(sessionID, *parsedURL)
 	if err != nil {
 		log.Errorw("RegisterFQDN: Error from RegisterFQDN", "error", err)
 
-		if errors.Is(err, services.ErrSessionNotFound) {
+		if errors.Is(err, onboarding.ErrSessionNotFound) {
 			data.Error = "Session not found or expired"
 			// Retry with form session ID as a last resort if different
 			if formSessionID != "" && formSessionID != sessionID {
 				log.Debugw("RegisterFQDN: Retrying with form session ID", "session_id", formSessionID)
-				resp2, err2 := onboardingService.RegisterFQDN(formSessionID, *parsedURL)
+				resp2, err2 := h.service.RegisterFQDN(formSessionID, *parsedURL)
 				if err2 == nil {
 					// Success with form session ID
 					h.setSessionCookie(c, resp2.SessionID)
@@ -302,9 +288,9 @@ func (h *WebHandler) RegisterFQDN(c echo.Context) error {
 				}
 				log.Errorw("RegisterFQDN: Retry also failed", "error", err2)
 			}
-		} else if errors.Is(err, services.ErrInvalidSessionState) {
+		} else if errors.Is(err, onboarding.ErrInvalidSessionState) {
 			data.Error = "Invalid session state - please start over"
-		} else if errors.Is(err, services.ErrFQDNVerificationFailed) {
+		} else if errors.Is(err, onboarding.ErrFQDNVerificationFailed) {
 			data.Error = fmt.Sprintf("FQDN verification failed: %v", err)
 		} else {
 			data.Error = fmt.Sprintf("Verification failed: %v", err)
@@ -361,21 +347,14 @@ func (h *WebHandler) RegisterProof(c echo.Context) error {
 		return h.render(c, "onboard.html", data)
 	}
 
-	// Create onboarding service
-	onboardingService, err := h.createOnboardingService()
-	if err != nil {
-		data.Error = "Service configuration error"
-		return h.render(c, "onboard.html", data)
-	}
-
 	// Register proof
-	resp, err := onboardingService.RegisterProof(sessionID, proof)
+	resp, err := h.service.RegisterProof(sessionID, proof)
 	if err != nil {
-		if errors.Is(err, services.ErrSessionNotFound) {
+		if errors.Is(err, onboarding.ErrSessionNotFound) {
 			data.Error = "Session not found or expired"
-		} else if errors.Is(err, services.ErrInvalidSessionState) {
+		} else if errors.Is(err, onboarding.ErrInvalidSessionState) {
 			data.Error = "Invalid session state - please start over"
-		} else if errors.Is(err, services.ErrProofVerificationFailed) {
+		} else if errors.Is(err, onboarding.ErrProofVerificationFailed) {
 			data.Error = fmt.Sprintf("Proof verification failed: %v", err)
 		} else {
 			data.Error = fmt.Sprintf("Verification failed: %v", err)
@@ -459,19 +438,11 @@ func (h *WebHandler) SubmitProvider(c echo.Context) error {
 		return h.render(c, "onboard.html", data)
 	}
 
-	// Create onboarding service
-	onboardingService, err := h.createOnboardingService()
-	if err != nil {
-		data.Error = "Service configuration error"
-		return h.render(c, "onboard.html", data)
-	}
-
 	// Use the onboarding service to submit the provider
-	err = onboardingService.SubmitProvider(sessionID)
-	if err != nil {
-		if errors.Is(err, services.ErrSessionNotFound) {
+	if err := h.service.SubmitProvider(sessionID); err != nil {
+		if errors.Is(err, onboarding.ErrSessionNotFound) {
 			data.Error = "Session not found or expired"
-		} else if errors.Is(err, services.ErrInvalidSessionState) {
+		} else if errors.Is(err, onboarding.ErrInvalidSessionState) {
 			data.Error = "Invalid session state - please start over"
 		} else {
 			data.Error = fmt.Sprintf("Failed to register provider: %v", err)
@@ -505,16 +476,8 @@ func (h *WebHandler) GetDelegation(c echo.Context) error {
 		}
 	}
 
-	// Create onboarding service
-	onboardingService, err := h.createOnboardingService()
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Service configuration error",
-		})
-	}
-
 	// Get delegation
-	delegationData, err := onboardingService.GetDelegation(sessionID)
+	delegationData, err := h.service.GetDelegation(sessionID)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Delegation not found",
@@ -528,10 +491,6 @@ func (h *WebHandler) GetDelegation(c echo.Context) error {
 }
 
 // Helper methods
-
-func (h *WebHandler) createOnboardingService() (*services.OnboardingService, error) {
-	return services.NewOnboardingServiceFromConfig(h.sessionStore, h.persistedStore, h.config.Onboarding)
-}
 
 // SetHelpTexts allows overriding the default help texts
 func (h *WebHandler) SetHelpTexts(helpTexts models.OnboardingHelpTexts) {

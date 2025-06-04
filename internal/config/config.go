@@ -30,15 +30,23 @@ type ServerConfig struct {
 type OnboardingConfig struct {
 	// SessionTimeout is the duration a session will remain active for
 	SessionTimeout time.Duration `mapstructure:"session_timeout"`
+
 	// FQDNVerificationTimeout is the duration we'll wait when dialing the operators domain
 	FQDNVerificationTimeout time.Duration `mapstructure:"fqdn_verification_timeout"`
-	// The Private Key of the indexing service used to sign delegations for the storage node.
-	IndexingServiceKey string `mapstructure:"indexing_service_key"`
-	// The UploadServiceDID used for instruction to operator when creating a delegation for the upload to storage node.
-	UploadServiceDID string `mapstructure:"upload_service_did"`
+
 	// AllowList is a list of DID's that are allowed to register. DID's may also be placed in to the AllowListTable of dynamo
 	// Note: setting this value will cause a write to the dynamo table AllowListTableName when application starts.
 	AllowList []string `mapstructure:"allow_list"`
+
+	// The UploadServiceDID used for instruction to operator when creating a delegation for the upload to storage node.
+	UploadServiceDID string `mapstructure:"upload_service_did"`
+
+	// KeyFilePath is a path to a .pem file containing the private key of the delegator.
+	KeyFilePath string `mapstructure:"key_file_path"`
+
+	// IndexingServiceProof is a Base64-encoded CIDv1 string containing a proof from the indexing service
+	// to the delegator allowing it to issue delegations to the storage node on its behalf for `claim/cache`.
+	IndexingServiceProof string `mapstructure:"indexing_service_proof"`
 }
 
 // LogConfig holds logging configuration
@@ -119,16 +127,18 @@ var Default = Config{
 	Onboarding: OnboardingConfig{
 		SessionTimeout:          12 * time.Hour,
 		FQDNVerificationTimeout: time.Minute,
-		IndexingServiceKey:      "",         // required during runtime
 		AllowList:               []string{}, // usually empty, candidates may be manually added to the AllowListTableName table
+		UploadServiceDID:        "",         // required config
+		IndexingServiceProof:    "",         // required config
+		KeyFilePath:             "",         // required config
 	},
 	Log: LogConfig{
 		Level: "info",
 	},
 	Dynamo: DynamoConfig{
-		Region:                "", // required
-		AllowListTableName:    "", // required
-		ProviderInfoTableName: "", // required
+		Region:                "", // required config
+		AllowListTableName:    "", // required config
+		ProviderInfoTableName: "", // required config
 		Endpoint:              "", // only used in testing
 	},
 }
@@ -147,7 +157,8 @@ func setDefaults(v *viper.Viper) {
 	// Onboarding defaults
 	v.SetDefault("onboarding.session_timeout", Default.Onboarding.SessionTimeout)
 	v.SetDefault("onboarding.fqdn_verification_timeout", Default.Onboarding.FQDNVerificationTimeout)
-	v.SetDefault("onboarding.indexing_service_key", Default.Onboarding.IndexingServiceKey)
+	v.SetDefault("onboarding.indexing_service_proof", Default.Onboarding.IndexingServiceProof)
+	v.SetDefault("onboarding.key_file_path", Default.Onboarding.KeyFilePath)
 	v.SetDefault("onboarding.allow_list", Default.Onboarding.AllowList)
 
 	// Dynamo defaults
@@ -173,8 +184,12 @@ func validate(config *Config) error {
 	}
 
 	// Validate onboarding config
-	if config.Onboarding.IndexingServiceKey == "" {
-		errs = multierror.Append(errs, fmt.Errorf("onboarding.indexing_service_key is required"))
+	if config.Onboarding.IndexingServiceProof == "" {
+		errs = multierror.Append(errs, fmt.Errorf("onboarding.indexing_service_proof is required"))
+	}
+
+	if config.Onboarding.KeyFilePath == "" {
+		errs = multierror.Append(errs, fmt.Errorf("onboarding.key_file_path is required"))
 	}
 
 	if config.Onboarding.UploadServiceDID == "" {

@@ -16,6 +16,7 @@ import (
 
 	"github.com/storacha/delegator/internal/config"
 	"github.com/storacha/delegator/internal/models"
+	"github.com/storacha/delegator/internal/onboarding"
 	"github.com/storacha/delegator/internal/storage"
 )
 
@@ -34,6 +35,7 @@ type WebHandler struct {
 	persistedStore storage.PersistentStore
 	config         *config.Config
 	helpTexts      *models.OnboardingHelpTexts
+	service        *onboarding.Service
 }
 
 // NewWebHandler creates a new web handler
@@ -56,12 +58,22 @@ func NewWebHandler(templatesDir string, sessionStore storage.SessionStore, persi
 	// Add more dynamic values from config if needed
 	helpTexts := models.GenerateHelpTexts(configMap)
 
+	service, err := onboarding.New(
+		cfg.Onboarding,
+		onboarding.WithSessionStore(sessionStore),
+		onboarding.WithPersistedStore(persistedStore),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create onboarding service: %w", err)
+	}
+
 	return &WebHandler{
 		templates:      templates,
 		sessionStore:   sessionStore,
 		persistedStore: persistedStore,
 		config:         cfg,
 		helpTexts:      helpTexts,
+		service:        service,
 	}, nil
 }
 
@@ -188,7 +200,6 @@ func (h *WebHandler) setSessionCookie(c echo.Context, sessionID string) {
 			Values: make(map[interface{}]interface{}),
 			Options: &sessions.Options{
 				Path:     "/",
-				MaxAge:   86400 * 7,
 				HttpOnly: true,
 			},
 		}
@@ -196,7 +207,6 @@ func (h *WebHandler) setSessionCookie(c echo.Context, sessionID string) {
 
 	sess.Options = &sessions.Options{
 		Path:     "/",
-		MaxAge:   86400 * 7, // 1 week
 		HttpOnly: true,
 		Secure:   c.Request().TLS != nil, // Secure if HTTPS
 		SameSite: http.SameSiteLaxMode,
@@ -280,7 +290,7 @@ func NewTemplateRenderer(templatesDir string) (*TemplateRenderer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to glob templates: %w", err)
 	}
-	
+
 	fmt.Printf("Found %d templates in %s: %v\n", len(pageTemplates), templatesDir, pageTemplates)
 
 	// For each page template, parse it with the base template

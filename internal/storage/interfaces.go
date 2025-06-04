@@ -1,6 +1,8 @@
 package storage
 
-import "github.com/storacha/delegator/internal/models"
+import (
+	"github.com/storacha/delegator/internal/models"
+)
 
 type PersistentStore interface {
 	IsAllowedDID(did string) (bool, error)

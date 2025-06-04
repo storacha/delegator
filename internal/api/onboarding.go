@@ -10,38 +10,32 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/storacha/go-ucanto/did"
-	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 
 	"github.com/storacha/delegator/internal/config"
 	"github.com/storacha/delegator/internal/models"
-	"github.com/storacha/delegator/internal/services"
+	"github.com/storacha/delegator/internal/onboarding"
 	"github.com/storacha/delegator/internal/storage"
 )
 
 // OnboardingHandler handles onboarding-related API endpoints
 type OnboardingHandler struct {
-	service *services.OnboardingService
+	service *onboarding.Service
 }
 
 // NewOnboardingHandler creates a new onboarding handler
-func NewOnboardingHandler(sessionStore storage.SessionStore, persistedStore storage.PersistentStore, cfg config.OnboardingConfig) (*OnboardingHandler, error) {
-	indexingServiceKey, err := ed25519.Parse(cfg.IndexingServiceKey)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing configured indexing service: %w", err)
-	}
-	uploadServiceDID, err := did.Parse(cfg.UploadServiceDID)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing configured upload service: %w", err)
-	}
-
-	service := services.NewOnboardingService(
-		sessionStore,
-		persistedStore,
-		cfg.SessionTimeout,
-		cfg.FQDNVerificationTimeout,
-		indexingServiceKey,
-		uploadServiceDID,
+func NewOnboardingHandler(
+	sessionStore storage.SessionStore,
+	persistedStore storage.PersistentStore,
+	cfg config.OnboardingConfig,
+) (*OnboardingHandler, error) {
+	service, err := onboarding.New(
+		cfg,
+		onboarding.WithSessionStore(sessionStore),
+		onboarding.WithPersistedStore(persistedStore),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating onboarding service: %w", err)
+	}
 
 	return &OnboardingHandler{
 		service: service,
@@ -113,21 +107,21 @@ func (h *OnboardingHandler) registerFQDN(c echo.Context) error {
 
 	resp, err := h.service.RegisterFQDN(req.SessionID, *strgURL)
 	if err != nil {
-		if errors.Is(err, services.ErrSessionNotFound) {
+		if errors.Is(err, onboarding.ErrSessionNotFound) {
 			return c.JSON(http.StatusNotFound, models.ErrorResponse{
 				Error:   "session_not_found",
 				Message: fmt.Sprintf("Session '%s' not found", req.SessionID),
 				Code:    http.StatusNotFound,
 			})
 		}
-		if errors.Is(err, services.ErrInvalidSessionState) {
+		if errors.Is(err, onboarding.ErrInvalidSessionState) {
 			return c.JSON(http.StatusBadRequest, models.ErrorResponse{
 				Error:   "invalid_session_state",
 				Message: err.Error(),
 				Code:    http.StatusBadRequest,
 			})
 		}
-		if errors.Is(err, services.ErrFQDNVerificationFailed) {
+		if errors.Is(err, onboarding.ErrFQDNVerificationFailed) {
 			return c.JSON(http.StatusBadRequest, models.ErrorResponse{
 				Error:   "fqdn_verification_failed",
 				Message: err.Error(),
@@ -203,14 +197,14 @@ func (h *OnboardingHandler) registerDID(c echo.Context) error {
 
 	resp, err := h.service.RegisterDID(strgDID, req.FilecoinAddress, req.ProofSetID, req.OperatorEmail)
 	if err != nil {
-		if errors.Is(err, services.ErrIsNotAllowed) {
+		if errors.Is(err, onboarding.ErrIsNotAllowed) {
 			return c.JSON(http.StatusForbidden, models.ErrorResponse{
 				Error:   "is_not_allowed",
 				Message: fmt.Sprintf("DID '%s' is not allowed", req.DID),
 				Code:    http.StatusForbidden,
 			})
 		}
-		if errors.Is(err, services.ErrIsAlreadyRegistered) {
+		if errors.Is(err, onboarding.ErrIsAlreadyRegistered) {
 			return c.JSON(http.StatusConflict, models.ErrorResponse{
 				Error:   "is_already_registered",
 				Message: fmt.Sprintf("DID '%s' is already registered", req.DID),
@@ -261,21 +255,21 @@ func (h *OnboardingHandler) registerProof(c echo.Context) error {
 
 	resp, err := h.service.RegisterProof(req.SessionID, req.Proof)
 	if err != nil {
-		if errors.Is(err, services.ErrSessionNotFound) {
+		if errors.Is(err, onboarding.ErrSessionNotFound) {
 			return c.JSON(http.StatusNotFound, models.ErrorResponse{
 				Error:   "session_not_found",
 				Message: fmt.Sprintf("Session '%s' not found", req.SessionID),
 				Code:    http.StatusNotFound,
 			})
 		}
-		if errors.Is(err, services.ErrInvalidSessionState) {
+		if errors.Is(err, onboarding.ErrInvalidSessionState) {
 			return c.JSON(http.StatusBadRequest, models.ErrorResponse{
 				Error:   "invalid_session_state",
 				Message: err.Error(),
 				Code:    http.StatusBadRequest,
 			})
 		}
-		if errors.Is(err, services.ErrProofVerificationFailed) {
+		if errors.Is(err, onboarding.ErrProofVerificationFailed) {
 			return c.JSON(http.StatusBadRequest, models.ErrorResponse{
 				Error:   "proof_verification_failed",
 				Message: err.Error(),
@@ -395,13 +389,13 @@ func (h *OnboardingHandler) submitProvider(c echo.Context) error {
 	// Submit the provider to the persistent store using our new service method
 	err = h.service.SubmitProvider(req.SessionID)
 	if err != nil {
-		if errors.Is(err, services.ErrSessionNotFound) {
+		if errors.Is(err, onboarding.ErrSessionNotFound) {
 			return c.JSON(http.StatusNotFound, models.ErrorResponse{
 				Error:   "session_not_found",
 				Message: fmt.Sprintf("Session '%s' not found", req.SessionID),
 				Code:    http.StatusNotFound,
 			})
-		} else if errors.Is(err, services.ErrInvalidSessionState) {
+		} else if errors.Is(err, onboarding.ErrInvalidSessionState) {
 			return c.JSON(http.StatusBadRequest, models.ErrorResponse{
 				Error:   "invalid_session_state",
 				Message: err.Error(),

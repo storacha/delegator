@@ -1,4 +1,4 @@
-package services
+package onboarding
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -15,12 +16,12 @@ import (
 	logging "github.com/ipfs/go-log"
 	"github.com/storacha/go-libstoracha/capabilities/blob"
 	"github.com/storacha/go-libstoracha/capabilities/blob/replica"
+	"github.com/storacha/go-libstoracha/capabilities/claim"
 	"github.com/storacha/go-libstoracha/capabilities/pdp"
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
-	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
+	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/go-ucanto/ucan"
-
-	"github.com/storacha/go-mkdelegation/pkg/delegation"
 
 	"github.com/storacha/delegator/internal/config"
 	"github.com/storacha/delegator/internal/models"
@@ -30,31 +31,74 @@ import (
 var log = logging.Logger("service/onboarding")
 
 // OnboardingService handles WSP onboarding logic
-type OnboardingService struct {
-	sessionStore          storage.SessionStore
-	persistedStore        storage.PersistentStore
-	sessionTimeout        time.Duration
-	domainCheckTimeout    time.Duration
-	indexingServiceSigner ucan.Signer
-	uploadServiceDID      did.DID
+type Service struct {
+	sessionStore   storage.SessionStore
+	persistedStore storage.PersistentStore
+
+	sessionTimeout     time.Duration
+	domainCheckTimeout time.Duration
+
+	delegatorSigner      principal.Signer
+	indexingServiceProof delegation.Proof
+	uploadServiceDID     did.DID
 }
 
-// NewOnboardingService creates a new onboarding service
-func NewOnboardingService(
-	sessionStore storage.SessionStore,
-	persistedStore storage.PersistentStore,
-	sessionTimeout, domainCheckTimeout time.Duration,
-	indexingServiceSigner ucan.Signer,
-	uploadServiceDID did.DID,
-) *OnboardingService {
-	return &OnboardingService{
-		sessionStore:          sessionStore,
-		persistedStore:        persistedStore,
-		sessionTimeout:        sessionTimeout,
-		domainCheckTimeout:    domainCheckTimeout,
-		indexingServiceSigner: indexingServiceSigner,
-		uploadServiceDID:      uploadServiceDID,
+type Option func(*Service)
+
+func WithSessionStore(store storage.SessionStore) Option {
+	return func(o *Service) {
+		o.sessionStore = store
 	}
+}
+
+func WithPersistedStore(store storage.PersistentStore) Option {
+	return func(o *Service) {
+		o.persistedStore = store
+	}
+}
+
+func New(cfg config.OnboardingConfig, opts ...Option) (*Service, error) {
+	// parse the upload service DID - used for instructing user to generate a proof to upload service from their
+	// storage node.
+	uploadServiceDID, err := did.Parse(cfg.UploadServiceDID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing configured upload service: %w", err)
+	}
+
+	// extract the indexing service proof - used to creating a delegation to the storage node allowing it to invoke
+	// 'claim/cache' on indexer.
+	indexerDelegation, err := delegation.Parse(cfg.IndexingServiceProof)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing indexing service proof: %w", err)
+	}
+	indexerProof := delegation.FromDelegation(indexerDelegation)
+
+	// read the delegators private key file
+	keyF, err := os.Open(cfg.KeyFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("error opening key file (%s): %w", cfg.KeyFilePath, err)
+	}
+
+	delegatorSigner, err := readPrivateKeyFromPEM(keyF)
+	if err != nil {
+		return nil, fmt.Errorf("error loading delegator signer: %w", err)
+	}
+
+	service := &Service{
+		sessionStore:         storage.NewMemoryStore(),
+		persistedStore:       storage.NewMemoryStore(),
+		sessionTimeout:       cfg.SessionTimeout,
+		domainCheckTimeout:   cfg.FQDNVerificationTimeout,
+		delegatorSigner:      delegatorSigner,
+		indexingServiceProof: indexerProof,
+		uploadServiceDID:     uploadServiceDID,
+	}
+
+	for _, opt := range opts {
+		opt(service)
+	}
+
+	return service, nil
 }
 
 var (
@@ -68,7 +112,7 @@ var (
 )
 
 // RegisterDID performs Step 3.1: DID registration, verification and delegation generation
-func (s *OnboardingService) RegisterDID(strgDID did.DID, filecoinAddress string, proofSetID uint64, operatorEmail string) (*models.DIDVerifyResponse, error) {
+func (s *Service) RegisterDID(strgDID did.DID, filecoinAddress string, proofSetID uint64, operatorEmail string) (*models.DIDVerifyResponse, error) {
 	// Check if DID is in allowlist of the persisted store.
 	if allowed, err := s.persistedStore.IsAllowedDID(strgDID.String()); err != nil {
 		log.Errorw("failed to check if DID is allowed for registration in persisted store", "did", strgDID.String(), "error", err)
@@ -138,7 +182,7 @@ func (s *OnboardingService) RegisterDID(strgDID did.DID, filecoinAddress string,
 }
 
 // GetSessionStatus returns the status of an onboarding session
-func (s *OnboardingService) GetSessionStatus(sessionID string) (*models.OnboardingStatusResponse, error) {
+func (s *Service) GetSessionStatus(sessionID string) (*models.OnboardingStatusResponse, error) {
 	session, err := s.sessionStore.GetSession(sessionID)
 	if err != nil {
 		return nil, err
@@ -160,7 +204,7 @@ func (s *OnboardingService) GetSessionStatus(sessionID string) (*models.Onboardi
 }
 
 // GetDelegation returns the delegation data for a session
-func (s *OnboardingService) GetDelegation(sessionID string) (string, error) {
+func (s *Service) GetDelegation(sessionID string) (string, error) {
 	session, err := s.sessionStore.GetSession(sessionID)
 	if err != nil {
 		return "", err
@@ -174,7 +218,7 @@ func (s *OnboardingService) GetDelegation(sessionID string) (string, error) {
 }
 
 // RegisterFQDN performs Step 3.3: FQDN verification and readiness check
-func (s *OnboardingService) RegisterFQDN(sessionID string, fqdnURL url.URL) (*models.FQDNVerifyResponse, error) {
+func (s *Service) RegisterFQDN(sessionID string, fqdnURL url.URL) (*models.FQDNVerifyResponse, error) {
 	// Debug log
 	log.Debugw("RegisterFQDN called", "session_id", sessionID, "url", fqdnURL.String())
 
@@ -230,7 +274,7 @@ func (s *OnboardingService) RegisterFQDN(sessionID string, fqdnURL url.URL) (*mo
 }
 
 // RegisterProof performs Step 3.4: Proof verification and provider registration
-func (s *OnboardingService) RegisterProof(sessionID string, proof string) (*models.ProofVerifyResponse, error) {
+func (s *Service) RegisterProof(sessionID string, proof string) (*models.ProofVerifyResponse, error) {
 	// Debug log
 	log.Debugw("RegisterProof called", "session_id", sessionID)
 
@@ -305,7 +349,7 @@ func (s *OnboardingService) RegisterProof(sessionID string, proof string) (*mode
 }
 
 // verifyFQDNReturnsCorrectDID makes an HTTP request to the FQDN and verifies it returns the expected DID
-func (s *OnboardingService) verifyFQDNReturnsCorrectDID(fqdnURL url.URL, expectedDID string) error {
+func (s *Service) verifyFQDNReturnsCorrectDID(fqdnURL url.URL, expectedDID string) error {
 	// Create HTTP client with reasonable timeout
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -383,38 +427,52 @@ func (s *OnboardingService) verifyFQDNReturnsCorrectDID(fqdnURL url.URL, expecte
 }
 
 // generateDelegation generates a delegation for the provider (stubbed)
-func (s *OnboardingService) generateDelegation(strgDID ucan.Principal) (string, error) {
-	indxToStrgDelegation, err := delegation.DelegateIndexingToStorage(s.indexingServiceSigner, strgDID)
+func (s *Service) generateDelegation(strgDID did.DID) (string, error) {
+	// the delegator creates a delegation for the storage node to invoke claim/cache w/ proof from indexer.
+	indxToStrgDelegation, err := delegation.Delegate(
+		s.delegatorSigner,
+		strgDID,
+		[]ucan.Capability[ucan.NoCaveats]{
+			ucan.NewCapability(
+				claim.CacheAbility,
+				s.delegatorSigner.DID().String(),
+				ucan.NoCaveats{},
+			),
+		},
+		delegation.WithNoExpiration(),
+		delegation.WithProof(s.indexingServiceProof),
+	)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate delegation from indexing service to storage node: %w", err)
 	}
-	isb, err := io.ReadAll(indxToStrgDelegation.Archive())
-	if err != nil {
-		return "", fmt.Errorf("failed to read indexer to storage delegation: %w", err)
-	}
 
-	return delegation.FormatDelegation(isb)
+	return delegation.Format(indxToStrgDelegation)
 }
 
 // validateProof validates the proof delegation
-func (s *OnboardingService) validateProof(proof string, providerDID string) error {
+func (s *Service) validateProof(proof string, providerDID string) error {
 	if strings.TrimSpace(proof) == "" {
 		return fmt.Errorf("proof cannot be empty")
 	}
 
-	strgDelegation, err := delegation.ParseDelegationContent(proof)
+	strgDelegation, err := delegation.Parse(proof)
 	if err != nil {
 		return err
 	}
 
-	if strgDelegation.Expiration != 0 && strgDelegation.Expiration <= int(time.Now().Unix()) {
-		return fmt.Errorf("delegation expired. expiration: %d, now: %d", strgDelegation.Expiration, time.Now().Unix())
+	expiration := strgDelegation.Expiration()
+
+	now := time.Now().Unix()
+	if expiration != nil {
+		if *expiration != 0 && *expiration <= int(now) {
+			return fmt.Errorf("delegation expired. expiration: %d, now: %d", expiration, now)
+		}
 	}
-	if strgDelegation.Issuer != providerDID {
-		return fmt.Errorf("delegation issuer (%s) does not match provider DID (%s)", strgDelegation.Issuer, providerDID)
+	if strgDelegation.Issuer().DID().String() != providerDID {
+		return fmt.Errorf("delegation issuer (%s) does not match provider DID (%s)", strgDelegation.Issuer().DID().String(), providerDID)
 	}
-	if strgDelegation.Audience != s.uploadServiceDID.DID().String() {
-		return fmt.Errorf("delegation audience (%s) does not match upload service DID (%s)", strgDelegation.Audience, s.uploadServiceDID.DID())
+	if strgDelegation.Audience().DID().String() != s.uploadServiceDID.DID().String() {
+		return fmt.Errorf("delegation audience (%s) does not match upload service DID (%s)", strgDelegation.Audience().DID().String(), s.uploadServiceDID.DID())
 	}
 	var expectedCapabilities = map[string]struct{}{
 		blob.AcceptAbility:      {},
@@ -422,16 +480,16 @@ func (s *OnboardingService) validateProof(proof string, providerDID string) erro
 		replica.AllocateAbility: {},
 		pdp.InfoAbility:         {},
 	}
-	if len(strgDelegation.Capabilities) != len(expectedCapabilities) {
-		return fmt.Errorf("expected exact %v capabilities, got %v", expectedCapabilities, strgDelegation.Capabilities)
+	if len(strgDelegation.Capabilities()) != len(expectedCapabilities) {
+		return fmt.Errorf("expected exact %v capabilities, got %v", expectedCapabilities, strgDelegation.Capabilities())
 	}
-	for _, c := range strgDelegation.Capabilities {
-		_, ok := expectedCapabilities[c.Can]
+	for _, c := range strgDelegation.Capabilities() {
+		_, ok := expectedCapabilities[c.Can()]
 		if !ok {
-			return fmt.Errorf("unexpected capability: %s", c.Can)
+			return fmt.Errorf("unexpected capability: %s", c.Can())
 		}
-		if c.With != providerDID {
-			return fmt.Errorf("capability %s has unexpected resource %s, expected: %s", c.Can, c.With, providerDID)
+		if c.With() != providerDID {
+			return fmt.Errorf("capability %s has unexpected resource %s, expected: %s", c.Can(), c.With(), providerDID)
 		}
 	}
 
@@ -439,7 +497,7 @@ func (s *OnboardingService) validateProof(proof string, providerDID string) erro
 }
 
 // storeProvider stores the provider in the registry (mimicking DynamoDB table)
-func (s *OnboardingService) storeProvider(session *models.OnboardingSession) error {
+func (s *Service) storeProvider(session *models.OnboardingSession) error {
 	now := time.Now()
 
 	// Store provider info with Filecoin address, ProofSetID, and OperatorEmail
@@ -464,7 +522,7 @@ func (s *OnboardingService) storeProvider(session *models.OnboardingSession) err
 }
 
 // SubmitProvider handles the final submission of a provider to the persistent store
-func (s *OnboardingService) SubmitProvider(sessionID string) error {
+func (s *Service) SubmitProvider(sessionID string) error {
 	// Get the session
 	session, err := s.sessionStore.GetSession(sessionID)
 	if err != nil {
@@ -511,7 +569,7 @@ func (s *OnboardingService) SubmitProvider(sessionID string) error {
 }
 
 // getNextStep determines the next step based on current status
-func (s *OnboardingService) getNextStep(status string) string {
+func (s *Service) getNextStep(status string) string {
 	switch status {
 	case models.StatusStarted:
 		return "register-did"
@@ -526,19 +584,4 @@ func (s *OnboardingService) getNextStep(status string) string {
 	default:
 		return "unknown"
 	}
-}
-
-// NewOnboardingServiceFromConfig creates a new onboarding service from config
-func NewOnboardingServiceFromConfig(sessionStore storage.SessionStore, persistedStore storage.PersistentStore, cfg config.OnboardingConfig) (*OnboardingService, error) {
-
-	indexingService, err := ed25519.Parse(cfg.IndexingServiceKey)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing configured indexing service: %w", err)
-	}
-	uploadDID, err := did.Parse(cfg.UploadServiceDID)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing configured upload service: %w", err)
-	}
-
-	return NewOnboardingService(sessionStore, persistedStore, cfg.SessionTimeout, cfg.FQDNVerificationTimeout, indexingService, uploadDID), nil
 }

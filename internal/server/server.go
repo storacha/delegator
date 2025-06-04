@@ -36,8 +36,8 @@ func New(cfg *config.Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(cfg.Onboarding.AllowList) > 0 {
-		if err := dynamoStore.AddAllowedDID(cfg.Onboarding.AllowList[0]); err != nil {
+	for _, l := range cfg.Onboarding.AllowList {
+		if err := dynamoStore.AddAllowedDID(l); err != nil {
 			return nil, err
 		}
 	}

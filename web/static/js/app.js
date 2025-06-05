@@ -430,3 +430,54 @@
     }
 
 })();
+
+// Global function for copying environment variables
+function copyEnvVars() {
+    const envVarsCode = document.querySelector('.env-vars-code code');
+    if (envVarsCode) {
+        const text = envVarsCode.textContent;
+        const button = document.querySelector('.copy-button');
+        
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(function() {
+                showCopyFeedback(button);
+            }).catch(function() {
+                fallbackCopyToClipboard(text, button);
+            });
+        } else {
+            fallbackCopyToClipboard(text, button);
+        }
+    }
+}
+
+// Helper functions for copying (if not in scope)
+function showCopyFeedback(button) {
+    const originalText = button.textContent;
+    button.textContent = '✅ Copied!';
+    button.classList.add('copy-feedback');
+    
+    setTimeout(function() {
+        button.textContent = originalText;
+        button.classList.remove('copy-feedback');
+    }, 2000);
+}
+
+function fallbackCopyToClipboard(text, button) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-999999px';
+    textarea.style.top = '-999999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    
+    try {
+        document.execCommand('copy');
+        showCopyFeedback(button);
+    } catch (err) {
+        console.error('Failed to copy text: ', err);
+    }
+    
+    document.body.removeChild(textarea);
+}

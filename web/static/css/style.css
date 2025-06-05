@@ -616,9 +616,18 @@ body {
 .detail-item {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
     margin-bottom: 0.5rem;
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--border-color);
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.detail-value {
+    flex: 1;
+    min-width: 0;
+    text-align: right;
 }
 
 .detail-label {
@@ -633,6 +642,10 @@ code {
     font-size: 0.875rem;
     color: var(--text-primary);
     border: 1px solid var(--border-color);
+    word-break: break-all;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    display: inline-block;
 }
 
 .progress-steps {
@@ -932,7 +945,7 @@ code {
 }
 
 /* High contrast mode support */
-@media (prefers-contrast: high) {
+@media (prefers-contrast: more) {
     :root {
         --border-color: #000000;
         --text-secondary: #000000;
@@ -942,4 +955,89 @@ code {
         --border-color: #ffffff;
         --text-secondary: #ffffff;
     }
+}
+
+/* Environment Variables Section */
+.env-vars-section {
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin: 2rem 0;
+}
+
+.env-vars-section h3 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+.env-vars-container {
+    position: relative;
+    margin: 1.5rem 0;
+}
+
+.env-vars-code {
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+    max-width: 100%;
+}
+
+.env-vars-code code {
+    color: var(--text-primary);
+    display: block;
+    white-space: pre;
+}
+
+.copy-button {
+    margin-top: 0.5rem;
+}
+
+.env-vars-instructions {
+    margin-top: 1.5rem;
+}
+
+.env-vars-instructions h4 {
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.env-vars-instructions ol {
+    padding-left: 1.5rem;
+    color: var(--text-secondary);
+}
+
+.env-vars-instructions li {
+    margin-bottom: 0.5rem;
+}
+
+.env-vars-note {
+    background: rgba(var(--warning-color-rgb), 0.1);
+    border: 1px solid var(--warning-color);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    margin-top: 1rem;
+    color: var(--text-primary);
+}
+
+.env-vars-note strong {
+    color: var(--warning-color);
+}
+
+/* Copy feedback animation */
+.copy-feedback {
+    animation: copyPulse 0.3s ease-in-out;
+}
+
+@keyframes copyPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
 }

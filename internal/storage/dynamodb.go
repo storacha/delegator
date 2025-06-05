@@ -22,6 +22,7 @@ type DynamoDBStore struct {
 	ctx                   context.Context
 	allowListTableName    string
 	providerInfoTableName string
+	providerWright        uint
 }
 
 // NewDynamoDBStore creates a new DynamoDB-backed store
@@ -67,6 +68,7 @@ func NewDynamoDBStore(config config.DynamoConfig) (*DynamoDBStore, error) {
 		ctx:                   ctx,
 		allowListTableName:    config.AllowListTableName,
 		providerInfoTableName: config.ProviderInfoTableName,
+		providerWright:        config.ProviderWeight,
 	}
 
 	return store, store.initialize(config)
@@ -118,11 +120,11 @@ func (d *DynamoDBStore) initialize(cfg config.DynamoConfig) error {
 			// - provider (string, primary key) - already defined above
 			// - endpoint (string)
 			// - address (string)
-			// - proof_set (number)
-			// - operator_email (string)
+			// - proofSet (number)
+			// - operatorEmail (string)
 			// - proof (string)
-			// - inserted_at (timestamp)
-			// - updated_at (timestamp)
+			// - insertedAt (timestamp)
+			// - updatedAt (timestamp)
 		},
 	}
 
@@ -181,10 +183,10 @@ func (d *DynamoDBStore) AddAllowedDID(did string) error {
 	// Use a simple approach - just add the required key directly
 	// This avoids any serialization issues with the struct
 	item := map[string]types.AttributeValue{
-		"did":      &types.AttributeValueMemberS{Value: did},
-		"added_by": &types.AttributeValueMemberS{Value: "system"},
-		"added_at": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
-		"notes":    &types.AttributeValueMemberS{Value: "Added via API"},
+		"did":     &types.AttributeValueMemberS{Value: did},
+		"addedBy": &types.AttributeValueMemberS{Value: "system"},
+		"addedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+		"notes":   &types.AttributeValueMemberS{Value: "Added via API"},
 	}
 
 	input := &dynamodb.PutItemInput{
@@ -246,10 +248,11 @@ func (d *DynamoDBStore) RegisterProvider(info *models.StorageProviderInfo) error
 	}
 
 	// Use string representation for numeric values
-	item["proof_set"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", info.ProofSet)}
+	item["proofSet"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", info.ProofSet)}
+	item["weight"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", d.providerWright)}
 
 	if info.OperatorEmail != "" {
-		item["operator_email"] = &types.AttributeValueMemberS{Value: info.OperatorEmail}
+		item["operatorEmail"] = &types.AttributeValueMemberS{Value: info.OperatorEmail}
 	}
 
 	if info.Proof != "" {
@@ -257,8 +260,8 @@ func (d *DynamoDBStore) RegisterProvider(info *models.StorageProviderInfo) error
 	}
 
 	// Format timestamps as strings
-	item["inserted_at"] = &types.AttributeValueMemberS{Value: info.InsertedAt.Format(time.RFC3339)}
-	item["updated_at"] = &types.AttributeValueMemberS{Value: info.UpdatedAt.Format(time.RFC3339)}
+	item["insertedAt"] = &types.AttributeValueMemberS{Value: info.InsertedAt.Format(time.RFC3339)}
+	item["updatedAt"] = &types.AttributeValueMemberS{Value: info.UpdatedAt.Format(time.RFC3339)}
 
 	input := &dynamodb.PutItemInput{
 		TableName: aws.String(d.providerInfoTableName),

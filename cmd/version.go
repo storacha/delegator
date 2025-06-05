@@ -26,11 +26,11 @@ var versionCmd = &cobra.Command{
 		cmd.Printf("Version: %s\n", Version)
 		cmd.Printf("Commit: %s\n", Commit)
 		cmd.Printf("Built: %s\n", BuildTime)
-		
+
 		// Log version info to actual logs (if logging is enabled)
-		verLog.Infow("Version information requested", 
-			"version", Version, 
-			"commit", Commit, 
+		verLog.Infow("Version information requested",
+			"version", Version,
+			"commit", Commit,
 			"build_time", BuildTime)
 	},
 }

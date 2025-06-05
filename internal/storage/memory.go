@@ -44,14 +44,14 @@ func (m *MemoryStore) IsAllowedDID(did string) (bool, error) {
 func (m *MemoryStore) AddAllowedDID(did string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.allowlist[did] = &models.DIDAllowlist{
 		DID:     did,
 		AddedBy: "system",
 		AddedAt: time.Now(),
 		Notes:   "Added via API",
 	}
-	
+
 	return nil
 }
 
@@ -60,8 +60,8 @@ func (m *MemoryStore) CreateSession(session *models.OnboardingSession) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	log.Debugw("Creating session", 
-		"session_id", session.SessionID, 
+	log.Debugw("Creating session",
+		"session_id", session.SessionID,
 		"did", session.DID)
 
 	m.sessions[session.SessionID] = session
@@ -69,10 +69,10 @@ func (m *MemoryStore) CreateSession(session *models.OnboardingSession) error {
 	// Dump all current sessions for debugging
 	log.Debugw("Current sessions in memory store", "count", len(m.sessions))
 	for id, s := range m.sessions {
-		log.Debugw("Session details", 
-			"session_id", id, 
-			"did", s.DID, 
-			"status", s.Status, 
+		log.Debugw("Session details",
+			"session_id", id,
+			"did", s.DID,
+			"status", s.Status,
 			"expires_at", s.ExpiresAt.Format(time.RFC3339))
 	}
 
@@ -88,10 +88,10 @@ func (m *MemoryStore) GetSession(sessionID string) (*models.OnboardingSession, e
 	// Dump all current sessions for debugging
 	log.Debugw("Available sessions in memory store", "count", len(m.sessions))
 	for id, s := range m.sessions {
-		log.Debugw("Session details", 
-			"session_id", id, 
-			"did", s.DID, 
-			"status", s.Status, 
+		log.Debugw("Session details",
+			"session_id", id,
+			"did", s.DID,
+			"status", s.Status,
 			"expires_at", s.ExpiresAt.Format(time.RFC3339))
 	}
 
@@ -103,15 +103,15 @@ func (m *MemoryStore) GetSession(sessionID string) (*models.OnboardingSession, e
 
 	// Check if session is expired
 	if time.Now().After(session.ExpiresAt) {
-		log.Debugw("Session expired", 
-			"session_id", sessionID, 
+		log.Debugw("Session expired",
+			"session_id", sessionID,
 			"expired_at", session.ExpiresAt.Format(time.RFC3339))
 		return nil, fmt.Errorf("session expired: %s", sessionID)
 	}
 
 	log.Debugw("Found session",
-		"session_id", session.SessionID, 
-		"did", session.DID, 
+		"session_id", session.SessionID,
+		"did", session.DID,
 		"status", session.Status)
 
 	return session, nil

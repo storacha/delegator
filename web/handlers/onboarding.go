@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -26,6 +27,7 @@ type OnboardingTemplateData struct {
 	FormData           *FormData
 	RequestedSessionID string
 	HelpTexts          models.OnboardingHelpTexts
+	PiriNodeEnvVars    map[string]string // Environment variables to display in step 5
 }
 
 // FormData represents form input data
@@ -78,6 +80,11 @@ func (h *WebHandler) OnboardingIndex(c echo.Context) error {
 		if step, err := strconv.Atoi(stepParam); err == nil && step >= 1 && step <= 5 {
 			data.Step = step
 		}
+	}
+
+	// If we're on step 5 and have a valid session, populate the environment variables
+	if data.Step == 5 && data.Session != nil {
+		data.PiriNodeEnvVars = h.generatePiriNodeEnvVars(data.Session)
 	}
 
 	return h.render(c, "onboard.html", data)
@@ -533,4 +540,24 @@ func (h *WebHandler) getNextStepFromStatus(status string) string {
 	default:
 		return "register-did"
 	}
+}
+
+// generatePiriNodeEnvVars generates the environment variables for piri node configuration
+func (h *WebHandler) generatePiriNodeEnvVars(session *models.OnboardingSession) map[string]string {
+	envVars := make(map[string]string)
+
+	// Add session-specific values
+	envVars["PIRI_PUBLIC_URL"] = session.FQDN
+	envVars["PIRI_PDP_PROOFSET"] = session.FilecoinAddress
+	envVars["PIRI_INDEXING_SERVICE_PROOF"] = session.DelegationData
+
+	// Add delegator URL from current request
+	envVars["PIRI_NODE_DELEGATOR_URL"] = h.config.Onboarding.UploadServiceDID
+
+	// Add any additional environment variables from the config
+	for key, value := range h.config.Onboarding.PiriNodeEnvVars {
+		envVars[strings.ToUpper(key)] = value
+	}
+
+	return envVars
 }

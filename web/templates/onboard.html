@@ -29,105 +29,116 @@
 <div class="onboard-step">
     <div class="step-content">
         <h2>Step 1: Register Your DID</h2>
-        <p>
-            Enter your DID (Decentralized Identifier) to begin the onboarding process. 
-            Your DID must be pre-authorized to join the Storacha network.
+        <p class="step-intro">
+            Enter your pre-authorized DID to begin setup.
+            Don't have authorization? <a href="https://storacha.network/node-providers">Request access here</a>.
         </p>
-        
+
         <form action="/onboard/register-did" method="post" class="onboard-form">
-            <div class="form-group">
-                <label for="did" class="form-label">
-                    DID (Decentralized Identifier) *
-                </label>
-                <input 
-                    type="text" 
-                    id="did" 
-                    name="did" 
-                    class="form-input" 
-                    placeholder="did:key:..."
-                    value="{{.FormData.DID}}"
-                    required
-                    pattern="did:.*"
-                    title="DID must start with 'did:'"
-                >
-                <div class="form-help">
-                    Example: <code>did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e</code>
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="did" class="form-label">
+                        DID (Decentralized Identifier)
+                        <span class="required">*</span>
+                    </label>
+                    <input
+                            type="text"
+                            id="did"
+                            name="did"
+                            class="form-input"
+                            placeholder="did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"
+                            value="{{.FormData.DID}}"
+                            required
+                            pattern="did:key:.*"
+                            title="DID must start with 'did:key:'"
+                    >
+                    <div class="form-help">
+                        <span class="help-label">Format:</span> Must start with <code>did:key:</code> followed by your identifier
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="filecoin_address" class="form-label">
+                        Filecoin Delegate Address
+                        <span class="required">*</span>
+                    </label>
+                    <input
+                            type="text"
+                            id="filecoin_address"
+                            name="filecoin_address"
+                            class="form-input"
+                            placeholder="0x7469B47e006D0660aB92AE560b27A1075EEcF97F"
+                            value="{{.FormData.FilecoinAddress}}"
+                            required
+                    >
+                    <div class="form-help">
+                        <span class="help-label">Format:</span> Ethereum-style address starting with <code>0x</code> (42 characters total)
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="proof_set_id" class="form-label">
+                        Proof Set ID
+                        <span class="required">*</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <span class="input-prefix">#</span>
+                        <input
+                                type="text"
+                                id="proof_set_id"
+                                name="proof_set_id"
+                                class="form-input with-prefix"
+                                placeholder="1234"
+                                value="{{.FormData.ProofSetID}}"
+                                required
+                                inputmode="numeric"
+                                maxlength="6"
+                        >
+                    </div>
+                    <div class="form-help">
+                        <span class="help-label">Example:</span> Your assigned proof set number
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="operator_email" class="form-label">
+                        Operator Email
+                        <span class="required">*</span>
+                    </label>
+                    <input
+                            type="email"
+                            id="operator_email"
+                            name="operator_email"
+                            class="form-input"
+                            placeholder="operator@example.com"
+                            value="{{.FormData.OperatorEmail}}"
+                            required
+                    >
+                    <div class="form-help">
+                        <span class="help-label">Purpose:</span> For operational alerts and network communications
+                    </div>
                 </div>
             </div>
-            
-            <div class="form-group">
-                <label for="filecoin_address" class="form-label">
-                    Filecoin Address *
-                </label>
-                <input 
-                    type="text" 
-                    id="filecoin_address" 
-                    name="filecoin_address" 
-                    class="form-input" 
-                    placeholder="f1..."
-                    value="{{.FormData.FilecoinAddress}}"
-                    required
-                >
-                <div class="form-help">
-                    Your Delegate Address (e.g., <code>0x7469B47e006D0660aB92AE560b27A1075EEcF97F</code>)
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="proof_set_id" class="form-label">
-                    Proof Set ID *
-                </label>
-                <input 
-                    type="number" 
-                    id="proof_set_id" 
-                    name="proof_set_id" 
-                    class="form-input" 
-                    placeholder="12345"
-                    value="{{.FormData.ProofSetID}}"
-                    required
-                    min="1"
-                >
-                <div class="form-help">
-                    Your Proof Set ID (a positive integer)
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="operator_email" class="form-label">
-                    Operator Email *
-                </label>
-                <input 
-                    type="email" 
-                    id="operator_email" 
-                    name="operator_email" 
-                    class="form-input" 
-                    placeholder="your.email@example.com"
-                    value="{{.FormData.OperatorEmail}}"
-                    required
-                >
-                <div class="form-help">
-                    Your contact email for operations-related communications
-                </div>
-            </div>
-            
+
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Register DID</button>
                 <a href="/" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
     </div>
-    
+
     <div class="step-help">
-        <h3>What is a DID?</h3>
-        <p>
-            A DID (Decentralized Identifier) is a unique identifier that you control. 
-            It's used to verify your identity without relying on centralized authorities.
-        </p>
-        <details>
-            <summary>{{.HelpTexts.DIDGeneration.Title}}</summary>
+        <h3>Need Help?</h3>
+        <div class="help-card">
+            <h4>What is a DID?</h4>
             <p>
-                {{.HelpTexts.DIDGeneration.Description}}
+                A DID (Decentralized Identifier) is your unique, cryptographic identity on the network that you control without relying on centralized authorities.
             </p>
+        </div>
+
+        <details class="help-details">
+            <summary>{{.HelpTexts.DIDGeneration.Title}}</summary>
+            <p>{{.HelpTexts.DIDGeneration.Description}}</p>
             {{if .HelpTexts.DIDGeneration.Command}}
             <pre><code>{{.HelpTexts.DIDGeneration.Command}}</code></pre>
             {{end}}
@@ -139,19 +150,37 @@
 {{if eq .Step 2}}
 <div class="onboard-step">
     <div class="step-content">
-        <h2>Step 2: Verify Your FQDN</h2>
+        <h2>Step 2: Verify Your Domain</h2>
         <p>
             Your DID has been successfully registered! Now provide the FQDN (Fully Qualified Domain Name) 
-            where your storage node is accessible.
+            where your piri node is accessible.
         </p>
         
         {{if .Session}}
         <div class="session-info">
-            <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
-            <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
-            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
-            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
-            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
+        <h3>Registration Details</h3>
+        <table>
+            <tr>
+                <td><strong>DID:</strong></td>
+                <td><code>{{.Session.DID}}</code></td>
+            </tr>
+            <tr>
+                <td><strong>Filecoin Address:</strong></td>
+                <td><code>{{.Session.FilecoinAddress}}</code></td>
+            </tr>
+            <tr>
+                <td><strong>Proof Set ID:</strong></td>
+                <td><code>{{.Session.ProofSetID}}</code></td>
+            </tr>
+            <tr>
+                <td><strong>Operator Email:</strong></td>
+                <td><code>{{.Session.OperatorEmail}}</code></td>
+            </tr>
+            <tr>
+                <td><strong>Status:</strong></td>
+                <td><span class="status-badge">⌛ {{.Session.Status}}</span></td>
+            </tr>
+        </table>
         </div>
         {{end}}
         
@@ -218,12 +247,33 @@
         
         {{if .Session}}
         <div class="session-info">
-            <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
-            <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
-            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
-            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
-            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
-            <p><strong>FQDN:</strong> <code>{{.Session.FQDN}}</code></p>
+            <h3>Registration Details</h3>
+            <table>
+                <tr>
+                    <td><strong>DID:</strong></td>
+                    <td><code>{{.Session.DID}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Filecoin Address:</strong></td>
+                    <td><code>{{.Session.FilecoinAddress}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Proof Set ID:</strong></td>
+                    <td><code>{{.Session.ProofSetID}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Operator Email:</strong></td>
+                    <td><code>{{.Session.OperatorEmail}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Fully Qualified Domain Name (FQDN):</strong></td>
+                    <td><code>{{.Session.FQDN}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Status:</strong></td>
+                    <td><span class="status-fqdn_verified">✅ {{.Session.Status}}</span></td>
+                </tr>
+            </table>
         </div>
         {{end}}
         
@@ -293,14 +343,14 @@
             <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
             <p><strong>FQDN:</strong> <code>{{.Session.FQDN}}</code></p>
             <p><strong>Status:</strong> <span class="status-pending">⏱ Ready for Submission</span></p>
-            
+
             {{if .Session.DelegationData}}
-            <div class="delegation-download">
+            <div class="delegation-display">
                 <h4>Your Delegation</h4>
-                <p>Download your delegation file for your records:</p>
-                <a href="/onboard/delegation/{{.Session.SessionID}}" class="btn btn-secondary" download>
-                    📄 Download Delegation File
-                </a>
+                <p>Copy this delegation string for your records:</p>
+                <div class="code-block">
+                    <code>{{.Session.DelegationData}}</code>
+                </div>
             </div>
             {{end}}
         </div>
@@ -329,25 +379,33 @@
         {{if .Session}}
         <div class="session-info success">
             <h3>Registration Details</h3>
-            <p><strong>Session ID:</strong> <code>{{.Session.SessionID}}</code></p>
-            <p><strong>DID:</strong> <code>{{.Session.DID}}</code></p>
-            <p><strong>Filecoin Address:</strong> <code>{{.Session.FilecoinAddress}}</code></p>
-            <p><strong>Proof Set ID:</strong> <code>{{.Session.ProofSetID}}</code></p>
-            <p><strong>Operator Email:</strong> <code>{{.Session.OperatorEmail}}</code></p>
-            <p><strong>FQDN:</strong> <code>{{.Session.FQDN}}</code></p>
-            <p><strong>Status:</strong> <span class="status-completed">✅ {{.Session.Status}}</span></p>
-            
-            {{if .Session.DelegationData}}
-            <div class="delegation-download">
-                <h4>Your Delegation</h4>
-                <p>Download your delegation file for your records:</p>
-                <a href="/onboard/delegation/{{.Session.SessionID}}" class="btn btn-primary" download>
-                    📄 Download Delegation File
-                </a>
-            </div>
-            {{end}}
-        </div>
-        {{end}}
+            <table>
+                <tr>
+                    <td><strong>DID:</strong></td>
+                    <td><code>{{.Session.DID}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Filecoin Address:</strong></td>
+                    <td><code>{{.Session.FilecoinAddress}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Proof Set ID:</strong></td>
+                    <td><code>{{.Session.ProofSetID}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Operator Email:</strong></td>
+                    <td><code>{{.Session.OperatorEmail}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Fully Qualified Domain Name (FQDN):</strong></td>
+                    <td><code>{{.Session.FQDN}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Status:</strong></td>
+                    <td><span class="status-completed">✅ {{.Session.Status}}</span></td>
+                </tr>
+            </table>
+        </div>        {{end}}
         
         <div class="next-steps">
             <h3>What's Next?</h3>
@@ -357,6 +415,28 @@
                 <li>Keep your delegation file secure - you may need it for future operations</li>
             </ul>
         </div>
+        
+        {{if .PiriNodeEnvVars}}
+        <div class="env-vars-section">
+            <h3>Configure Your Piri Node</h3>
+            <p>To complete the setup, add the following environment variables when starting your piri node:</p>
+            
+            <div class="env-vars-container">
+                <pre class="env-vars-code"><code>{{range $key, $value := .PiriNodeEnvVars}}export {{$key}}="{{$value}}"
+{{end}}</code></pre>
+                <button class="btn btn-secondary copy-button" onclick="copyEnvVars()">📋 Copy to Clipboard</button>
+            </div>
+            
+            <div class="env-vars-instructions">
+                <h4>Instructions:</h4>
+                <ol>
+                    <li>Copy the environment variables above</li>
+                    <li>Add them to your piri node environment</li>
+                    <li>Restart your piri node to apply the changes</li>
+                </ol>
+            </div>
+        </div>
+        {{end}}
         
         <div class="form-actions">
             <a href="/" class="btn btn-primary">Return to Dashboard</a>

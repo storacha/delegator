@@ -422,7 +422,7 @@
             <p>To complete the setup, add the following environment variables when starting your piri node:</p>
             
             <div class="env-vars-container">
-                <pre class="env-vars-code"><code>{{range $key, $value := .PiriNodeEnvVars}}export {{$key}}="{{$value}}"
+                <pre class="env-vars-code"><code>{{range $key, $value := .PiriNodeEnvVars}}export {{$key}}='{{$value}}'
 {{end}}</code></pre>
                 <button class="btn btn-secondary copy-button" onclick="copyEnvVars()">📋 Copy to Clipboard</button>
             </div>

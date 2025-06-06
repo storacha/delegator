@@ -22,7 +22,7 @@ type DynamoDBStore struct {
 	ctx                   context.Context
 	allowListTableName    string
 	providerInfoTableName string
-	providerWright        uint
+	providerWeight        uint
 }
 
 // NewDynamoDBStore creates a new DynamoDB-backed store

@@ -38,9 +38,10 @@ type Service struct {
 	sessionTimeout     time.Duration
 	domainCheckTimeout time.Duration
 
-	delegatorSigner      principal.Signer
-	indexingServiceProof delegation.Proof
-	uploadServiceDID     did.DID
+	delegatorSigner       principal.Signer
+	indexingServiceProof  delegation.Proof
+	uploadServiceDID      did.DID
+	indexingServiceWebDID did.DID
 }
 
 type Option func(*Service)
@@ -65,6 +66,12 @@ func New(cfg config.OnboardingConfig, opts ...Option) (*Service, error) {
 		return nil, fmt.Errorf("error parsing configured upload service: %w", err)
 	}
 
+	// parse the indexing service DID - used for creating the delegation from deletator to storage node.
+	indexingServiceWebDID, err := did.Parse(cfg.IndexingServiceWebDID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing configured indexing service: %w", err)
+	}
+
 	// extract the indexing service proof - used to creating a delegation to the storage node allowing it to invoke
 	// 'claim/cache' on indexer.
 	indexerDelegation, err := delegation.Parse(cfg.IndexingServiceProof)
@@ -85,13 +92,14 @@ func New(cfg config.OnboardingConfig, opts ...Option) (*Service, error) {
 	}
 
 	service := &Service{
-		sessionStore:         storage.NewMemoryStore(),
-		persistedStore:       storage.NewMemoryStore(),
-		sessionTimeout:       cfg.SessionTimeout,
-		domainCheckTimeout:   cfg.FQDNVerificationTimeout,
-		delegatorSigner:      delegatorSigner,
-		indexingServiceProof: indexerProof,
-		uploadServiceDID:     uploadServiceDID,
+		sessionStore:          storage.NewMemoryStore(),
+		persistedStore:        storage.NewMemoryStore(),
+		sessionTimeout:        cfg.SessionTimeout,
+		domainCheckTimeout:    cfg.FQDNVerificationTimeout,
+		delegatorSigner:       delegatorSigner,
+		indexingServiceProof:  indexerProof,
+		uploadServiceDID:      uploadServiceDID,
+		indexingServiceWebDID: indexingServiceWebDID,
 	}
 
 	for _, opt := range opts {
@@ -435,7 +443,7 @@ func (s *Service) generateDelegation(strgDID did.DID) (string, error) {
 		[]ucan.Capability[ucan.NoCaveats]{
 			ucan.NewCapability(
 				claim.CacheAbility,
-				s.delegatorSigner.DID().String(),
+				s.indexingServiceWebDID.String(),
 				ucan.NoCaveats{},
 			),
 		},

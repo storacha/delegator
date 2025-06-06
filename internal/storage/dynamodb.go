@@ -249,7 +249,7 @@ func (d *DynamoDBStore) RegisterProvider(info *models.StorageProviderInfo) error
 
 	// Use string representation for numeric values
 	item["proofSet"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", info.ProofSet)}
-	item["weight"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", d.providerWright)}
+	item["weight"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", d.providerWeight)}
 
 	if info.OperatorEmail != "" {
 		item["operatorEmail"] = &types.AttributeValueMemberS{Value: info.OperatorEmail}

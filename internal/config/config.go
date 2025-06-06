@@ -48,6 +48,9 @@ type OnboardingConfig struct {
 	// to the delegator allowing it to issue delegations to the storage node on its behalf for `claim/cache`.
 	IndexingServiceProof string `mapstructure:"indexing_service_proof"`
 
+	// IndexingServiceWebDID is the did:web of the indexing service
+	IndexingServiceWebDID string `mapstructure:"indexing_service_web_did"`
+
 	// PiriNodeEnvVars is a map of environment variables to display to operators after successful onboarding
 	// These will be shown in step 5 for operators to configure their piri node
 	PiriNodeEnvVars map[string]string `mapstructure:"piri_node_env_vars"`
@@ -139,6 +142,7 @@ var Default = Config{
 		AllowList:               []string{},          // usually empty, candidates may be manually added to the AllowListTableName table
 		UploadServiceDID:        "",                  // required config
 		IndexingServiceProof:    "",                  // required config
+		IndexingServiceWebDID:   "",                  // required config
 		KeyFilePath:             "",                  // required config
 		PiriNodeEnvVars:         map[string]string{}, // optional, additional env vars to display
 	},
@@ -169,6 +173,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("onboarding.session_timeout", Default.Onboarding.SessionTimeout)
 	v.SetDefault("onboarding.fqdn_verification_timeout", Default.Onboarding.FQDNVerificationTimeout)
 	v.SetDefault("onboarding.indexing_service_proof", Default.Onboarding.IndexingServiceProof)
+	v.SetDefault("onboarding.indexing_service_web_did", Default.Onboarding.IndexingServiceProof)
 	v.SetDefault("onboarding.key_file_path", Default.Onboarding.KeyFilePath)
 	v.SetDefault("onboarding.allow_list", Default.Onboarding.AllowList)
 	v.SetDefault("onboarding.piri_node_env_vars", Default.Onboarding.PiriNodeEnvVars)
@@ -199,6 +204,10 @@ func validate(config *Config) error {
 	// Validate onboarding config
 	if config.Onboarding.IndexingServiceProof == "" {
 		errs = multierror.Append(errs, fmt.Errorf("onboarding.indexing_service_proof is required"))
+	}
+
+	if config.Onboarding.IndexingServiceWebDID == "" {
+		errs = multierror.Append(errs, fmt.Errorf("onboarding.indexing_service_web_did is required"))
 	}
 
 	if config.Onboarding.KeyFilePath == "" {

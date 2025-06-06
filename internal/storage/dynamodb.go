@@ -68,7 +68,7 @@ func NewDynamoDBStore(config config.DynamoConfig) (*DynamoDBStore, error) {
 		ctx:                   ctx,
 		allowListTableName:    config.AllowListTableName,
 		providerInfoTableName: config.ProviderInfoTableName,
-		providerWright:        config.ProviderWeight,
+		providerWeight:        config.ProviderWeight,
 	}
 
 	return store, store.initialize(config)

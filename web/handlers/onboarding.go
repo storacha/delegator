@@ -548,11 +548,8 @@ func (h *WebHandler) generatePiriNodeEnvVars(session *models.OnboardingSession) 
 
 	// Add session-specific values
 	envVars["PIRI_PUBLIC_URL"] = session.FQDN
-	envVars["PIRI_PDP_PROOFSET"] = session.FilecoinAddress
+	envVars["PIRI_PDP_PROOFSET"] = strconv.FormatUint(session.ProofSetID, 10)
 	envVars["PIRI_INDEXING_SERVICE_PROOF"] = session.DelegationData
-
-	// Add delegator URL from current request
-	envVars["PIRI_NODE_DELEGATOR_URL"] = h.config.Onboarding.UploadServiceDID
 
 	// Add any additional environment variables from the config
 	for key, value := range h.config.Onboarding.PiriNodeEnvVars {

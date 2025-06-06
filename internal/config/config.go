@@ -67,6 +67,11 @@ type DynamoConfig struct {
 	// Name of table we persist registered user data to
 	ProviderInfoTableName string `mapstructure:"provider_info_table_name"`
 
+	// ProviderWeight is the weight that will be assigned to a provider
+	// when they are registered. This value will affect their odds of being
+	// selected for an upload. `0` means they will not be selected.
+	ProviderWeight uint `mapstructure:"provider_weight"`
+
 	// Endpoint may be set for local testing, usually with docker, e.g.
 	// docker run -p 8000:8000 amazon/dynamodb-local -jar DynamoDBLocal.jar -sharedDb
 	// then set endpoint to localhost:8080
@@ -144,6 +149,7 @@ var Default = Config{
 		Region:                "", // required config
 		AllowListTableName:    "", // required config
 		ProviderInfoTableName: "", // required config
+		ProviderWeight:        0,  // default to 0, may manually be edited in store by operator
 		Endpoint:              "", // only used in testing
 	},
 }
@@ -172,6 +178,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("dynamo.allow_list_table_name", Default.Dynamo.Endpoint)
 	v.SetDefault("dynamo.provider_info_table_name", Default.Dynamo.Endpoint)
 	v.SetDefault("dynamo.endpoint", Default.Dynamo.Endpoint)
+	v.SetDefault("dynamo.provider_weight", Default.Dynamo.ProviderWeight)
 }
 
 func validate(config *Config) error {

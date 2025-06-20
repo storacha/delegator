@@ -4,18 +4,22 @@ import "time"
 
 // OnboardingSession tracks multi-step onboarding progress
 type OnboardingSession struct {
-	SessionID       string    `json:"session_id" db:"session_id"`
-	DID             string    `json:"did" db:"did"`
-	Status          string    `json:"status" db:"status"`
-	DelegationData  string    `json:"delegation_data,omitempty" db:"delegation_data"`
-	FQDN            string    `json:"fqdn,omitempty" db:"fqdn"`
-	Proof           string    `json:"proof,omitempty" db:"proof"`
-	FilecoinAddress string    `json:"filecoin_address,omitempty" db:"filecoin_address"`
-	ProofSetID      uint64    `json:"proof_set_id,omitempty" db:"proof_set_id"`
-	OperatorEmail   string    `json:"operator_email,omitempty" db:"operator_email"`
-	CreatedAt       time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
-	ExpiresAt       time.Time `json:"expires_at" db:"expires_at"`
+	SessionID       string `json:"session_id" db:"session_id"`
+	DID             string `json:"did" db:"did"`
+	Status          string `json:"status" db:"status"`
+	DelegationData  string `json:"delegation_data,omitempty" db:"delegation_data"`
+	FQDN            string `json:"fqdn,omitempty" db:"fqdn"`
+	Proof           string `json:"proof,omitempty" db:"proof"`
+	FilecoinAddress string `json:"filecoin_address,omitempty" db:"filecoin_address"`
+	ProofSetID      uint64 `json:"proof_set_id,omitempty" db:"proof_set_id"`
+	OperatorEmail   string `json:"operator_email,omitempty" db:"operator_email"`
+	// Storage testing fields
+	StorageTestPassed bool      `json:"storage_test_passed,omitempty" db:"storage_test_passed"`
+	StorageTestCID    string    `json:"storage_test_cid,omitempty" db:"storage_test_cid"`
+	StorageTestError  string    `json:"storage_test_error,omitempty" db:"storage_test_error"`
+	CreatedAt         time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
+	ExpiresAt         time.Time `json:"expires_at" db:"expires_at"`
 }
 
 // OnboardingSession status constants
@@ -23,6 +27,7 @@ const (
 	StatusStarted       = "started"
 	StatusDIDVerified   = "did_verified"
 	StatusFQDNVerified  = "fqdn_verified"
+	StatusStorageTested = "storage_tested"
 	StatusProofVerified = "proof_verified"
 	StatusCompleted     = "completed"
 	StatusExpired       = "expired"
@@ -117,4 +122,21 @@ type OnboardingStatusResponse struct {
 	CreatedAt       string `json:"created_at"`
 	ExpiresAt       string `json:"expires_at"`
 	NextStep        string `json:"next_step,omitempty"`
+}
+
+type StorageTestRequest struct {
+	SessionID string `json:"session_id" validate:"required"`
+}
+
+// StorageTestResponse represents the response for storage capability testing
+type StorageTestResponse struct {
+	SessionID        string `json:"session_id"`
+	Status           string `json:"status"`
+	TestBlobSize     int64  `json:"test_blob_size"`
+	TestBlobCID      string `json:"test_blob_cid,omitempty"`
+	AllocateSuccess  bool   `json:"allocate_success"`
+	AcceptSuccess    bool   `json:"accept_success"`
+	RetrievalSuccess bool   `json:"retrieval_success"`
+	TestDurationMs   int64  `json:"test_duration_ms"`
+	ErrorMessage     string `json:"error_message,omitempty"`
 }

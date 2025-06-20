@@ -143,6 +143,68 @@ func (h *OnboardingHandler) registerFQDN(c echo.Context) error {
 	})
 }
 
+// testStorage handles POST /api/v1/onboard/test-storage
+func (h *OnboardingHandler) testStorage(c echo.Context) error {
+	var req models.StorageTestRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+			Code:    http.StatusBadRequest,
+		})
+	}
+
+	if req.SessionID == "" {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "missing_session_id",
+			Message: "Session ID is required",
+			Code:    http.StatusBadRequest,
+		})
+	}
+
+	resp, err := h.service.TestStorage(req.SessionID)
+	if err != nil {
+		if errors.Is(err, onboarding.ErrSessionNotFound) {
+			return c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error:   "session_not_found",
+				Message: fmt.Sprintf("Session '%s' not found", req.SessionID),
+				Code:    http.StatusNotFound,
+			})
+		}
+		if errors.Is(err, onboarding.ErrInvalidSessionState) {
+			return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+				Error:   "invalid_session_state",
+				Message: err.Error(),
+				Code:    http.StatusBadRequest,
+			})
+		}
+		if errors.Is(err, onboarding.ErrStorageTestFailed) {
+			return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+				Error:   "storage_test_failed",
+				Message: err.Error(),
+				Code:    http.StatusBadRequest,
+			})
+		}
+		// Internal server error for other cases
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "storage_test_error",
+			Message: err.Error(),
+			Code:    http.StatusInternalServerError,
+		})
+	}
+
+	message := "Storage test completed successfully"
+	if !resp.AllocateSuccess || !resp.AcceptSuccess {
+		message = "Storage test completed with failures"
+	}
+
+	return c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Message: message,
+		Data:    resp,
+	})
+}
+
 // registerDID handles POST /api/v1/onboard/register-did
 func (h *OnboardingHandler) registerDID(c echo.Context) error {
 	var req models.DIDRegisterRequest

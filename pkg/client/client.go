@@ -152,6 +152,24 @@ func (c *Client) RegisterFQDN(ctx context.Context, sessionID, fqdnURL string) (*
 	return &resp, nil
 }
 
+// TestStorage tests the storage capabilities (blob/allocate and blob/accept) for the given session.
+func (c *Client) TestStorage(ctx context.Context, sessionID string) (*models.StorageTestResponse, error) {
+	if sessionID == "" {
+		return nil, fmt.Errorf("session ID cannot be empty")
+	}
+
+	req := models.StorageTestRequest{
+		SessionID: sessionID,
+	}
+
+	var resp models.StorageTestResponse
+	if err := c.doRequest(ctx, http.MethodPost, "/api/v1/onboard/test-storage", req, &resp); err != nil {
+		return nil, fmt.Errorf("testing storage: %w", err)
+	}
+
+	return &resp, nil
+}
+
 // RegisterProof submits a proof delegation to complete the onboarding process.
 func (c *Client) RegisterProof(ctx context.Context, sessionID, proof string) (*models.ProofVerifyResponse, error) {
 	if sessionID == "" {

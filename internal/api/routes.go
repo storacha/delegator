@@ -91,6 +91,7 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, sessionStore storage.Sessi
 	onboard := v1.Group("/onboard")
 	onboard.POST("/register-did", onboardingHandler.registerDID)
 	onboard.POST("/register-fqdn", onboardingHandler.registerFQDN)
+	onboard.POST("/test-storage", onboardingHandler.testStorage)
 	onboard.POST("/register-proof", onboardingHandler.registerProof)
 	onboard.POST("/submit-provider", onboardingHandler.submitProvider)
 	onboard.GET("/status/:session_id", onboardingHandler.getSessionStatus)

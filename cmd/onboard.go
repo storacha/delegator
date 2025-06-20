@@ -45,11 +45,26 @@ This command will:
 	RunE: runRegisterFQDN,
 }
 
+// testStorageCmd represents the test-storage command
+var testStorageCmd = &cobra.Command{
+	Use:   "test-storage",
+	Short: "Test storage capabilities",
+	Long: `Step 3.4: Test blob/allocate and blob/accept capabilities on your storage node.
+
+This command will:
+1. Test blob/allocate capability with a small test blob
+2. Test blob/accept capability by uploading test data  
+3. Validate blob/accept by retrieving the content from the location commitment
+4. Verify your storage node can handle both required capabilities
+5. Update your onboarding session status on success`,
+	RunE: runTestStorage,
+}
+
 // registerProofCmd represents the register-proof command
 var registerProofCmd = &cobra.Command{
 	Use:   "register-proof",
 	Short: "Register and verify proof delegation",
-	Long: `Step 3.4: Submit proof delegation and complete WSP onboarding.
+	Long: `Step 3.5: Submit proof delegation and complete WSP onboarding.
 
 This command will:
 1. Verify the provided proof delegation is valid
@@ -86,6 +101,7 @@ func init() {
 	clientCmd.AddCommand(onboardCmd)
 	onboardCmd.AddCommand(registerDIDCmd)
 	onboardCmd.AddCommand(registerFQDNCmd)
+	onboardCmd.AddCommand(testStorageCmd)
 	onboardCmd.AddCommand(registerProofCmd)
 	onboardCmd.AddCommand(statusCmd)
 	onboardCmd.AddCommand(downloadDelegationCmd)
@@ -99,6 +115,10 @@ func init() {
 	registerFQDNCmd.Flags().StringVar(&urlFlag, "url", "", "WSP FQDN URL (required)")
 	registerFQDNCmd.MarkFlagRequired("session-id")
 	registerFQDNCmd.MarkFlagRequired("url")
+
+	// test-storage flags
+	testStorageCmd.Flags().StringVar(&sessionIDFlag, "session-id", "", "Onboarding session ID (required)")
+	testStorageCmd.MarkFlagRequired("session-id")
 
 	// register-proof flags
 	registerProofCmd.Flags().StringVar(&sessionIDFlag, "session-id", "", "Onboarding session ID (required)")
@@ -188,6 +208,65 @@ func runRegisterFQDN(cmd *cobra.Command, args []string) error {
 	fmt.Printf("1. Generate a delegation on your storage node for the upload service\n")
 	fmt.Printf("2. Submit the delegation/proof to complete onboarding:\n")
 	fmt.Printf("   delegator client onboard register-proof --session-id %s --proof \"<your-delegation-proof>\"\n", sessionIDFlag)
+	fmt.Printf("3. Check your session status:\n")
+	fmt.Printf("   delegator client onboard status --session-id %s\n\n", sessionIDFlag)
+
+	return nil
+}
+
+func runTestStorage(cmd *cobra.Command, args []string) error {
+	c, err := newClient()
+	if err != nil {
+		return fmt.Errorf("creating client: %w", err)
+	}
+
+	resp, err := c.TestStorage(newContext(), sessionIDFlag)
+	if err != nil {
+		if apiErr, ok := err.(*client.APIError); ok {
+			if apiErr.IsNotFound() {
+				return fmt.Errorf("session not found: %w", err)
+			}
+			if apiErr.IsBadRequest() {
+				return fmt.Errorf("invalid session state for storage test: %w", err)
+			}
+		}
+		return fmt.Errorf("testing storage: %w", err)
+	}
+
+	// Pretty print the response
+	output, err := json.MarshalIndent(resp, "", "  ")
+	if err != nil {
+		return fmt.Errorf("formatting response: %w", err)
+	}
+
+	fmt.Println(string(output))
+
+	// Provide next steps
+	if resp.AllocateSuccess && resp.AcceptSuccess && resp.RetrievalSuccess {
+		fmt.Printf("\n\n✅ Storage test completed successfully!\n")
+		fmt.Printf("Your storage node can handle both required capabilities:\n")
+		fmt.Printf("  ✅ blob/allocate - Can allocate space for storage\n")
+		fmt.Printf("  ✅ blob/accept - Can accept and store blobs (validated via retrieval)\n\n")
+		fmt.Printf("Next steps:\n")
+		fmt.Printf("1. Generate a delegation on your storage node for the upload service\n")
+		fmt.Printf("2. Submit the delegation/proof to complete onboarding:\n")
+		fmt.Printf("   delegator client onboard register-proof --session-id %s --proof \"<your-delegation-proof>\"\n", sessionIDFlag)
+	} else {
+		fmt.Printf("\n\n❌ Storage test failed!\n")
+		fmt.Printf("Your storage node test results:\n")
+		if resp.AllocateSuccess {
+			fmt.Printf("  ✅ blob/allocate - Working\n")
+		} else {
+			fmt.Printf("  ❌ blob/allocate - Failed\n")
+		}
+		if resp.AcceptSuccess {
+			fmt.Printf("  ✅ blob/accept - Working (including retrieval validation)\n")
+		} else {
+			fmt.Printf("  ❌ blob/accept - Failed (could not store or retrieve content)\n")
+		}
+		fmt.Printf("\nPlease fix the failing operations and try again.\n")
+	}
+
 	fmt.Printf("3. Check your session status:\n")
 	fmt.Printf("   delegator client onboard status --session-id %s\n\n", sessionIDFlag)
 

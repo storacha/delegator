@@ -1,6 +1,7 @@
 package onboarding
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,13 +15,22 @@ import (
 
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log"
+	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/capabilities/blob"
 	"github.com/storacha/go-libstoracha/capabilities/blob/replica"
 	"github.com/storacha/go-libstoracha/capabilities/claim"
 	"github.com/storacha/go-libstoracha/capabilities/pdp"
+	"github.com/storacha/go-libstoracha/capabilities/types"
+	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	fdm "github.com/storacha/go-ucanto/core/result/failure/datamodel"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
+	uhttp "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
 
 	"github.com/storacha/delegator/internal/config"
@@ -42,6 +52,10 @@ type Service struct {
 	indexingServiceProof  delegation.Proof
 	uploadServiceDID      did.DID
 	indexingServiceWebDID did.DID
+
+	// StorageTester for testing storage provider capabilities
+	// Can be swapped with Guppy client when ready
+	storageTester StorageTester
 }
 
 type Option func(*Service)
@@ -55,6 +69,12 @@ func WithSessionStore(store storage.SessionStore) Option {
 func WithPersistedStore(store storage.PersistentStore) Option {
 	return func(o *Service) {
 		o.persistedStore = store
+	}
+}
+
+func WithStorageTester(tester StorageTester) Option {
+	return func(s *Service) {
+		s.storageTester = tester
 	}
 }
 
@@ -100,6 +120,7 @@ func New(cfg config.OnboardingConfig, opts ...Option) (*Service, error) {
 		indexingServiceProof:  indexerProof,
 		uploadServiceDID:      uploadServiceDID,
 		indexingServiceWebDID: indexingServiceWebDID,
+		storageTester:         NewSimpleStorageTester(delegatorSigner), // Default storage tester
 	}
 
 	for _, opt := range opts {
@@ -117,6 +138,7 @@ var (
 	ErrInvalidSessionState     = errors.New("invalid session state")
 	ErrFQDNVerificationFailed  = errors.New("FQDN verification failed")
 	ErrProofVerificationFailed = errors.New("proof verification failed")
+	ErrStorageTestFailed       = errors.New("storage test failed")
 )
 
 // RegisterDID performs Step 3.1: DID registration, verification and delegation generation
@@ -281,7 +303,87 @@ func (s *Service) RegisterFQDN(sessionID string, fqdnURL url.URL) (*models.FQDNV
 	}, nil
 }
 
-// RegisterProof performs Step 3.4: Proof verification and provider registration
+// TestStorage performs Step 3.4: Storage capability testing (blob/allocate and blob/accept)
+func (s *Service) TestStorage(sessionID string) (*models.StorageTestResponse, error) {
+	startTime := time.Now()
+
+	// Debug log
+	log.Debugw("TestStorage called", "session_id", sessionID)
+
+	// Get the session
+	session, err := s.sessionStore.GetSession(strings.TrimSpace(sessionID))
+	if err != nil {
+		return nil, ErrSessionNotFound
+	}
+
+	log.Debugw("Found session for storage testing",
+		"session_id", session.SessionID,
+		"did", session.DID,
+		"status", session.Status,
+		"fqdn", session.FQDN)
+
+	// Check if session has expired
+	if time.Now().After(session.ExpiresAt) {
+		return nil, fmt.Errorf("%w: session expired", ErrInvalidSessionState)
+	}
+
+	// Check if session is in the correct state (should be FQDN verified)
+	if session.Status != models.StatusFQDNVerified {
+		return nil, fmt.Errorf("%w: expected status '%s', got '%s'",
+			ErrInvalidSessionState, models.StatusFQDNVerified, session.Status)
+	}
+
+	// Use the stored delegation data directly
+	// Perform storage test
+	testResult, err := s.performStorageTest(session.FQDN, session.DID, session.DelegationData)
+	if err != nil {
+		// Record the test failure
+		session.StorageTestPassed = false
+		session.StorageTestError = err.Error()
+		session.UpdatedAt = time.Now()
+
+		// Still update the session even on failure for tracking
+		if updateErr := s.sessionStore.UpdateSession(session); updateErr != nil {
+			log.Errorw("failed to update session after storage test failure", "error", updateErr)
+		}
+
+		return &models.StorageTestResponse{
+			SessionID:        sessionID,
+			Status:           session.Status, // Keep current status on failure
+			TestBlobSize:     testResult.BlobSize,
+			TestBlobCID:      testResult.BlobCID,
+			AllocateSuccess:  testResult.AllocateSuccess,
+			AcceptSuccess:    testResult.AcceptSuccess,
+			RetrievalSuccess: testResult.RetrievalSuccess,
+			TestDurationMs:   time.Since(startTime).Milliseconds(),
+			ErrorMessage:     err.Error(),
+		}, fmt.Errorf("%w: %s", ErrStorageTestFailed, err.Error())
+	}
+
+	// Test passed - update session
+	session.Status = models.StatusStorageTested
+	session.StorageTestPassed = true
+	session.StorageTestCID = testResult.BlobCID
+	session.StorageTestError = ""
+	session.UpdatedAt = time.Now()
+
+	if err := s.sessionStore.UpdateSession(session); err != nil {
+		return nil, fmt.Errorf("failed to update session: %w", err)
+	}
+
+	return &models.StorageTestResponse{
+		SessionID:        sessionID,
+		Status:           models.StatusStorageTested,
+		TestBlobSize:     testResult.BlobSize,
+		TestBlobCID:      testResult.BlobCID,
+		AllocateSuccess:  testResult.AllocateSuccess,
+		AcceptSuccess:    testResult.AcceptSuccess,
+		RetrievalSuccess: testResult.RetrievalSuccess,
+		TestDurationMs:   time.Since(startTime).Milliseconds(),
+	}, nil
+}
+
+// RegisterProof performs Step 3.5: Proof verification and provider registration
 func (s *Service) RegisterProof(sessionID string, proof string) (*models.ProofVerifyResponse, error) {
 	// Debug log
 	log.Debugw("RegisterProof called", "session_id", sessionID)
@@ -321,14 +423,14 @@ func (s *Service) RegisterProof(sessionID string, proof string) (*models.ProofVe
 		return nil, fmt.Errorf("%w: session expired", ErrInvalidSessionState)
 	}
 
-	// Check if session is in the correct state (should be FQDN verified)
-	if session.Status != models.StatusFQDNVerified {
+	// Check if session is in the correct state (should be storage tested)
+	if session.Status != models.StatusStorageTested {
 		log.Debugw("Wrong session state for RegisterProof",
 			"session_id", session.SessionID,
-			"expected_status", models.StatusFQDNVerified,
+			"expected_status", models.StatusStorageTested,
 			"actual_status", session.Status)
 		return nil, fmt.Errorf("%w: expected status '%s', got '%s'",
-			ErrInvalidSessionState, models.StatusFQDNVerified, session.Status)
+			ErrInvalidSessionState, models.StatusStorageTested, session.Status)
 	}
 
 	// Validate the proof
@@ -576,6 +678,87 @@ func (s *Service) SubmitProvider(sessionID string) error {
 	return nil
 }
 
+// StorageTestResult contains the results of a storage test
+type StorageTestResult struct {
+	BlobSize         int64
+	BlobCID          string
+	AllocateSuccess  bool
+	AcceptSuccess    bool
+	RetrievalSuccess bool
+}
+
+// performStorageTest executes the actual storage test against the provider using the pluggable StorageTester
+func (s *Service) performStorageTest(fqdnURL, providerDID string, delegationData string) (*StorageTestResult, error) {
+	// Generate structured test data with useful metadata
+	testMetadata := map[string]interface{}{
+		// Test identification
+		"test_type": "delegator_storage_verification",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+
+		// Test subject information
+		"storage_provider": map[string]string{
+			"did":  providerDID,
+			"fqdn": fqdnURL,
+		},
+
+		// Test parameters
+		"test_capabilities": []string{"blob/allocate", "blob/accept"},
+		"test_purpose":      "Verify storage provider can handle basic blob operations during onboarding",
+
+		// Debugging info
+		"delegator_service": "storacha-delegator",
+		"network":           "storacha",
+
+		// Verification data (deterministic but useful)
+		"expected_operations": map[string]string{
+			"allocate": "Should reserve space for blob storage",
+			"accept":   "Should confirm blob can be stored and retrieved from location commitment",
+		},
+
+		// Test payload
+		"message": "This is a test blob used to verify storage provider capabilities during WSP onboarding. If you see this data, the storage test was successful!",
+	}
+
+	testDataJSON, err := json.MarshalIndent(testMetadata, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal test metadata: %w", err)
+	}
+
+	testData := testDataJSON
+
+	testRequest := StorageCapabilityTestRequest{
+		StorageNodeURL: fqdnURL,
+		StorageNodeDID: providerDID,
+		DelegationData: delegationData,
+		TestData:       testData,
+	}
+
+	ctx := context.Background()
+	storageResult, err := s.storageTester.TestStorageCapabilities(ctx, testRequest)
+	if err != nil {
+		return nil, fmt.Errorf("storage testing failed: %w", err)
+	}
+
+	// Convert to our internal result format
+	result := &StorageTestResult{
+		BlobSize:         storageResult.TestBlobSize,
+		BlobCID:          storageResult.TestBlobCID,
+		AllocateSuccess:  storageResult.AllocateSuccess,
+		AcceptSuccess:    storageResult.AcceptSuccess,
+		RetrievalSuccess: storageResult.RetrievalSuccess,
+	}
+
+	// If either test failed, include error message
+	if !storageResult.AllocateSuccess || !storageResult.AcceptSuccess {
+		if storageResult.ErrorMessage != "" {
+			return result, fmt.Errorf("storage tests failed: %s", storageResult.ErrorMessage)
+		}
+		return result, fmt.Errorf("storage capability tests failed")
+	}
+
+	return result, nil
+}
+
 // getNextStep determines the next step based on current status
 func (s *Service) getNextStep(status string) string {
 	switch status {
@@ -584,6 +767,8 @@ func (s *Service) getNextStep(status string) string {
 	case models.StatusDIDVerified:
 		return "register-fqdn"
 	case models.StatusFQDNVerified:
+		return "test-storage"
+	case models.StatusStorageTested:
 		return "register-proof"
 	case models.StatusProofVerified:
 		return "completed"
@@ -592,4 +777,308 @@ func (s *Service) getNextStep(status string) string {
 	default:
 		return "unknown"
 	}
+}
+
+// StorageTester defines the interface for testing storage provider storage capabilities
+// This interface allows us to swap implementations (e.g., Guppy client when ready)
+type StorageTester interface {
+	// TestStorageCapabilities tests both blob/allocate and blob/accept operations
+	TestStorageCapabilities(ctx context.Context, req StorageCapabilityTestRequest) (*StorageCapabilityTestResult, error)
+}
+
+// StorageCapabilityTestRequest contains the parameters needed for storage capability testing
+type StorageCapabilityTestRequest struct {
+	StorageNodeURL string // FQDN of the storage node
+	StorageNodeDID string // DID of the storage node
+	DelegationData string // Delegation for authentication
+	TestData       []byte // Test blob data
+}
+
+// StorageCapabilityTestResult contains the results of storage capability testing
+type StorageCapabilityTestResult struct {
+	AllocateSuccess  bool   // Whether blob/allocate succeeded
+	AcceptSuccess    bool   // Whether blob/accept succeeded
+	RetrievalSuccess bool   // Whether blob retrieval succeeded
+	TestBlobCID      string // CID of the test blob
+	TestBlobSize     int64  // Size of the test blob
+	ErrorMessage     string // Error details if any operation failed
+}
+
+// SimpleStorageTester provides basic storage testing until Guppy is ready
+type SimpleStorageTester struct {
+	delegatorSigner principal.Signer
+}
+
+// NewSimpleStorageTester creates a basic storage tester implementation
+func NewSimpleStorageTester(signer principal.Signer) *SimpleStorageTester {
+	return &SimpleStorageTester{
+		delegatorSigner: signer,
+	}
+}
+
+// TestStorageCapabilities implements actual UCAN invocations like the real Piri client
+func (st *SimpleStorageTester) TestStorageCapabilities(ctx context.Context, req StorageCapabilityTestRequest) (*StorageCapabilityTestResult, error) {
+	// Create proper multihash digest from test data
+	digest, err := multihash.Sum(req.TestData, multihash.SHA2_256, -1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create digest: %w", err)
+	}
+
+	// Calculate test blob properties
+	testBlobSize := int64(len(req.TestData))
+	testBlobCID := "bafkrei" + digest.B58String()[:50] // Simplified CID representation
+
+	result := &StorageCapabilityTestResult{
+		TestBlobCID:      testBlobCID,
+		TestBlobSize:     testBlobSize,
+		AllocateSuccess:  false,
+		AcceptSuccess:    false,
+		RetrievalSuccess: false, // Keep for API compatibility, but will mirror AcceptSuccess
+	}
+
+	// Parse storage node DID and URL
+	storageNodeDID, err := did.Parse(req.StorageNodeDID)
+	if err != nil {
+		result.ErrorMessage = fmt.Sprintf("invalid storage node DID: %v", err)
+		return result, nil
+	}
+
+	storageURL, err := url.Parse(req.StorageNodeURL)
+	if err != nil {
+		result.ErrorMessage = fmt.Sprintf("invalid storage URL: %v", err)
+		return result, nil
+	}
+
+	// Parse delegation for authentication
+	storageDelegation, err := delegation.Parse(req.DelegationData)
+	if err != nil {
+		result.ErrorMessage = fmt.Sprintf("failed to parse delegation: %v", err)
+		return result, nil
+	}
+
+	// Create UCAN transport connection like real Piri client
+	channel := uhttp.NewHTTPChannel(storageURL)
+	conn, err := client.NewConnection(st.delegatorSigner, channel)
+	if err != nil {
+		result.ErrorMessage = fmt.Sprintf("failed to create UCAN connection: %v", err)
+		return result, nil
+	}
+
+	// Test 1: blob/allocate - Reserve space for storage
+	allocateSuccess, err := st.testBlobAllocate(conn, storageNodeDID, digest, uint64(testBlobSize), storageDelegation)
+	if err != nil {
+		result.ErrorMessage = fmt.Sprintf("blob/allocate failed: %v", err)
+		return result, nil
+	}
+	result.AllocateSuccess = allocateSuccess
+
+	// Test 2: blob/accept + validation via retrieval - Accept blob and verify it's retrievable
+	if allocateSuccess {
+		acceptSuccess, err := st.testBlobAcceptWithValidation(ctx, conn, storageNodeDID, digest, uint64(testBlobSize), storageDelegation, req.TestData)
+		if err != nil {
+			result.ErrorMessage = fmt.Sprintf("blob/accept validation failed: %v", err)
+			return result, nil
+		}
+		result.AcceptSuccess = acceptSuccess
+		result.RetrievalSuccess = acceptSuccess // Retrieval success mirrors accept success
+	}
+
+	log.Debugw("UCAN storage capability tests completed",
+		"storage_node", req.StorageNodeDID,
+		"allocate_success", result.AllocateSuccess,
+		"accept_success", result.AcceptSuccess,
+		"digest", digest.B58String())
+
+	return result, nil
+}
+
+// testBlobAllocate performs actual blob.Allocate.Invoke() like the real Piri client
+func (st *SimpleStorageTester) testBlobAllocate(conn client.Connection, storageNodeDID did.DID, digest multihash.Multihash, size uint64, storageDelegation delegation.Delegation) (bool, error) {
+	// Create blob/allocate invocation exactly like pkg/client/client.go
+	inv, err := blob.Allocate.Invoke(
+		st.delegatorSigner,
+		storageNodeDID,
+		storageNodeDID.String(),
+		blob.AllocateCaveats{
+			Space: storageNodeDID, // Use storage node as space for testing
+			Blob: types.Blob{
+				Digest: digest,
+				Size:   size,
+			},
+			Cause: nil, // Test invocation doesn't need a cause
+		},
+		delegation.WithProof(delegation.FromDelegation(storageDelegation)),
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to create blob/allocate invocation: %w", err)
+	}
+
+	// Execute the invocation
+	res, err := client.Execute([]invocation.Invocation{inv}, conn)
+	if err != nil {
+		return false, fmt.Errorf("failed to execute blob/allocate: %w", err)
+	}
+
+	// Read the receipt exactly like the real client
+	reader, err := receipt.NewReceiptReaderFromTypes[blob.AllocateOk, fdm.FailureModel](
+		blob.AllocateOkType(),
+		fdm.FailureType(),
+		types.Converters...,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to create receipt reader: %w", err)
+	}
+
+	rcptLink, ok := res.Get(inv.Link())
+	if !ok {
+		return false, fmt.Errorf("no receipt for allocation invocation")
+	}
+
+	rcpt, err := reader.Read(rcptLink, res.Blocks())
+	if err != nil {
+		return false, fmt.Errorf("failed to read allocation receipt: %w", err)
+	}
+
+	// Check if allocation was successful
+	allocResult, err := result.Unwrap(result.MapError(rcpt.Out(), failure.FromFailureModel))
+	if err != nil {
+		log.Debugw("Blob allocation failed", "error", err, "digest", digest.B58String())
+		return false, fmt.Errorf("allocation failed: %w", err)
+	}
+
+	log.Debugw("Blob allocation successful",
+		"digest", digest.B58String(),
+		"size", allocResult.Size,
+		"has_address", allocResult.Address != nil)
+
+	return true, nil
+}
+
+// testBlobAcceptWithValidation performs actual blob.Accept.Invoke() and validates by retrieving the content
+func (st *SimpleStorageTester) testBlobAcceptWithValidation(ctx context.Context, conn client.Connection, storageNodeDID did.DID, digest multihash.Multihash, size uint64, storageDelegation delegation.Delegation, testData []byte) (bool, error) {
+	// Create blob/accept invocation exactly like pkg/client/client.go
+	inv, err := blob.Accept.Invoke(
+		st.delegatorSigner,
+		storageNodeDID,
+		storageNodeDID.String(),
+		blob.AcceptCaveats{
+			Space: storageNodeDID, // Use storage node as space for testing
+			Blob: types.Blob{
+				Digest: digest,
+				Size:   size,
+			},
+			Put: blob.Promise{
+				UcanAwait: blob.Await{
+					Selector: ".out.ok",
+					Link:     nil, // Test invocation uses dummy put link
+				},
+			},
+		},
+		delegation.WithProof(delegation.FromDelegation(storageDelegation)),
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to create blob/accept invocation: %w", err)
+	}
+
+	// Execute the invocation
+	res, err := client.Execute([]invocation.Invocation{inv}, conn)
+	if err != nil {
+		return false, fmt.Errorf("failed to execute blob/accept: %w", err)
+	}
+
+	// Read the receipt exactly like the real client
+	reader, err := receipt.NewReceiptReaderFromTypes[blob.AcceptOk, fdm.FailureModel](
+		blob.AcceptOkType(),
+		fdm.FailureType(),
+		types.Converters...,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to create receipt reader: %w", err)
+	}
+
+	rcptLink, ok := res.Get(inv.Link())
+	if !ok {
+		return false, fmt.Errorf("no receipt for accept invocation")
+	}
+
+	rcpt, err := reader.Read(rcptLink, res.Blocks())
+	if err != nil {
+		return false, fmt.Errorf("failed to read accept receipt: %w", err)
+	}
+
+	// Check if accept was successful
+	acceptResult, err := result.Unwrap(result.MapError(rcpt.Out(), failure.FromFailureModel))
+	if err != nil {
+		log.Debugw("Blob accept failed", "error", err, "digest", digest.B58String())
+		return false, fmt.Errorf("accept failed: %w", err)
+	}
+
+	log.Debugw("Blob accept successful",
+		"digest", digest.B58String(),
+		"site", acceptResult.Site.String())
+
+	// Extract location commitment URL from the accept result
+	locationURL, err := url.Parse(acceptResult.Site.String())
+	if err != nil {
+		log.Debugw("Failed to parse location URL", "site", acceptResult.Site.String(), "error", err)
+		// Accept succeeded in UCAN terms but we can't validate with retrieval
+		return false, fmt.Errorf("accept succeeded but location URL invalid: %w", err)
+	}
+
+	// Validate the accept by retrieving the content from the location commitment
+	// Accept is only truly successful if we can retrieve the original data
+	retrievalSuccess, err := st.validateRetrievalFromLocation(ctx, locationURL, testData)
+	if err != nil {
+		return false, fmt.Errorf("accept succeeded but retrieval validation failed: %w", err)
+	}
+
+	if !retrievalSuccess {
+		return false, fmt.Errorf("accept succeeded but could not retrieve the original content")
+	}
+
+	log.Debugw("Blob accept validation successful",
+		"digest", digest.B58String(),
+		"location", locationURL.String())
+
+	return true, nil
+}
+
+// validateRetrievalFromLocation validates that we can retrieve the original content from the location commitment
+func (st *SimpleStorageTester) validateRetrievalFromLocation(ctx context.Context, locationURL *url.URL, originalData []byte) (bool, error) {
+	// Create HTTP client with reasonable timeout
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, locationURL.String(), nil)
+	if err != nil {
+		return false, fmt.Errorf("creating retrieval request: %w", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("making retrieval request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("retrieval failed with status %d", resp.StatusCode)
+	}
+
+	// Read response body
+	retrievedData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, fmt.Errorf("reading retrieved content: %w", err)
+	}
+
+	// Verify the retrieved content matches exactly what we originally sent
+	if !bytes.Equal(retrievedData, originalData) {
+		return false, fmt.Errorf("retrieved content does not match original data")
+	}
+
+	log.Debugw("Content retrieval validation successful",
+		"location", locationURL.String(),
+		"size", len(retrievedData))
+
+	return true, nil
 }

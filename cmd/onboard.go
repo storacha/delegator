@@ -56,7 +56,11 @@ This command will:
 2. Test blob/accept capability by uploading test data  
 3. Validate blob/accept by retrieving the content from the location commitment
 4. Verify your storage node can handle both required capabilities
-5. Update your onboarding session status on success`,
+5. Update your onboarding session status on success
+
+You must provide a storage test proof that authorizes the Delegator to execute 
+blob/allocate and blob/accept invocations on your behalf. This proof will be used by 
+the piri ucan server to validate the authorization.`,
 	RunE: runTestStorage,
 }
 
@@ -90,11 +94,12 @@ var downloadDelegationCmd = &cobra.Command{
 }
 
 var (
-	didFlag       string
-	sessionIDFlag string
-	outputFile    string
-	urlFlag       string
-	proofFlag     string
+	didFlag              string
+	sessionIDFlag        string
+	outputFile           string
+	urlFlag              string
+	proofFlag            string
+	storageTestProofFlag string
 )
 
 func init() {
@@ -118,7 +123,9 @@ func init() {
 
 	// test-storage flags
 	testStorageCmd.Flags().StringVar(&sessionIDFlag, "session-id", "", "Onboarding session ID (required)")
+	testStorageCmd.Flags().StringVar(&storageTestProofFlag, "storage-test-proof", "", "Storage test proof for authorization (required)")
 	testStorageCmd.MarkFlagRequired("session-id")
+	testStorageCmd.MarkFlagRequired("storage-test-proof")
 
 	// register-proof flags
 	registerProofCmd.Flags().StringVar(&sessionIDFlag, "session-id", "", "Onboarding session ID (required)")
@@ -205,10 +212,13 @@ func runRegisterFQDN(cmd *cobra.Command, args []string) error {
 
 	// Provide next steps
 	fmt.Printf("\n\nNext steps:\n")
-	fmt.Printf("1. Generate a delegation on your storage node for the upload service\n")
-	fmt.Printf("2. Submit the delegation/proof to complete onboarding:\n")
+	fmt.Printf("1. Generate a storage test proof on your storage node that authorizes the Delegator\n")
+	fmt.Printf("2. Test your storage capabilities:\n")
+	fmt.Printf("   delegator client onboard test-storage --session-id %s --storage-test-proof \"<your-storage-test-proof>\"\n", sessionIDFlag)
+	fmt.Printf("3. Generate a delegation on your storage node for the upload service\n")
+	fmt.Printf("4. Submit the delegation/proof to complete onboarding:\n")
 	fmt.Printf("   delegator client onboard register-proof --session-id %s --proof \"<your-delegation-proof>\"\n", sessionIDFlag)
-	fmt.Printf("3. Check your session status:\n")
+	fmt.Printf("5. Check your session status:\n")
 	fmt.Printf("   delegator client onboard status --session-id %s\n\n", sessionIDFlag)
 
 	return nil
@@ -220,7 +230,7 @@ func runTestStorage(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating client: %w", err)
 	}
 
-	resp, err := c.TestStorage(newContext(), sessionIDFlag)
+	resp, err := c.TestStorage(newContext(), sessionIDFlag, storageTestProofFlag)
 	if err != nil {
 		if apiErr, ok := err.(*client.APIError); ok {
 			if apiErr.IsNotFound() {
@@ -246,7 +256,8 @@ func runTestStorage(cmd *cobra.Command, args []string) error {
 		fmt.Printf("\n\n✅ Storage test completed successfully!\n")
 		fmt.Printf("Your storage node can handle both required capabilities:\n")
 		fmt.Printf("  ✅ blob/allocate - Can allocate space for storage\n")
-		fmt.Printf("  ✅ blob/accept - Can accept and store blobs (validated via retrieval)\n\n")
+		fmt.Printf("  ✅ blob/accept - Can accept and store blobs (validated via retrieval)\n")
+		fmt.Printf("✅ Used storage test proof for authorization\n\n")
 		fmt.Printf("Next steps:\n")
 		fmt.Printf("1. Generate a delegation on your storage node for the upload service\n")
 		fmt.Printf("2. Submit the delegation/proof to complete onboarding:\n")
@@ -265,6 +276,7 @@ func runTestStorage(cmd *cobra.Command, args []string) error {
 			fmt.Printf("  ❌ blob/accept - Failed (could not store or retrieve content)\n")
 		}
 		fmt.Printf("\nPlease fix the failing operations and try again.\n")
+		fmt.Printf("Make sure your storage test proof is valid and authorizes the required capabilities.\n")
 	}
 
 	fmt.Printf("3. Check your session status:\n")

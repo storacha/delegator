@@ -162,7 +162,15 @@ func (h *OnboardingHandler) testStorage(c echo.Context) error {
 		})
 	}
 
-	resp, err := h.service.TestStorage(req.SessionID)
+	if req.StorageTestProof == "" {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "missing_storage_test_proof",
+			Message: "Storage test proof is required for storage testing",
+			Code:    http.StatusBadRequest,
+		})
+	}
+
+	resp, err := h.service.TestStorage(req.SessionID, req.StorageTestProof)
 	if err != nil {
 		if errors.Is(err, onboarding.ErrSessionNotFound) {
 			return c.JSON(http.StatusNotFound, models.ErrorResponse{

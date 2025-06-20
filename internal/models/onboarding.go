@@ -125,7 +125,8 @@ type OnboardingStatusResponse struct {
 }
 
 type StorageTestRequest struct {
-	SessionID string `json:"session_id" validate:"required"`
+	SessionID        string `json:"session_id" validate:"required"`
+	StorageTestProof string `json:"storage_test_proof" validate:"required"` // Required user-provided storage test proof for authorization
 }
 
 // StorageTestResponse represents the response for storage capability testing

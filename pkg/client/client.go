@@ -152,14 +152,20 @@ func (c *Client) RegisterFQDN(ctx context.Context, sessionID, fqdnURL string) (*
 	return &resp, nil
 }
 
-// TestStorage tests the storage capabilities (blob/allocate and blob/accept) for the given session.
-func (c *Client) TestStorage(ctx context.Context, sessionID string) (*models.StorageTestResponse, error) {
+// TestStorage tests the storage capabilities (blob/allocate and blob/accept) for the given session
+// with a required storage test proof for storage authorization.
+func (c *Client) TestStorage(ctx context.Context, sessionID, storageTestProof string) (*models.StorageTestResponse, error) {
 	if sessionID == "" {
 		return nil, fmt.Errorf("session ID cannot be empty")
 	}
 
+	if storageTestProof == "" {
+		return nil, fmt.Errorf("storage test proof cannot be empty")
+	}
+
 	req := models.StorageTestRequest{
-		SessionID: sessionID,
+		SessionID:        sessionID,
+		StorageTestProof: storageTestProof,
 	}
 
 	var resp models.StorageTestResponse

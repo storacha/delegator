@@ -12,14 +12,18 @@
         </div>
         <div class="progress-step {{if eq .Step 3}}active{{else if gt .Step 3}}completed{{end}}">
             <span class="step-number">3</span>
-            <span class="step-label">Proof Submission</span>
+            <span class="step-label">Storage Testing</span>
         </div>
         <div class="progress-step {{if eq .Step 4}}active{{else if gt .Step 4}}completed{{end}}">
             <span class="step-number">4</span>
+            <span class="step-label">Proof Submission</span>
+        </div>
+        <div class="progress-step {{if eq .Step 5}}active{{else if gt .Step 5}}completed{{end}}">
+            <span class="step-number">5</span>
             <span class="step-label">Review</span>
         </div>
-        <div class="progress-step {{if eq .Step 5}}active{{end}}">
-            <span class="step-number">5</span>
+        <div class="progress-step {{if eq .Step 6}}active{{end}}">
+            <span class="step-number">6</span>
             <span class="step-label">Complete</span>
         </div>
     </div>
@@ -240,9 +244,109 @@
 {{if eq .Step 3}}
 <div class="onboard-step">
     <div class="step-content">
-        <h2>Step 3: Submit Delegation Proof</h2>
+        <h2>Step 3: Test Storage Capabilities</h2>
         <p>
-            Your FQDN has been verified! Now submit your delegation proof to complete the onboarding process.
+            Your FQDN has been verified! Now we need to test your storage node's capabilities 
+            by running blob/allocate and blob/accept operations. You must provide a storage test 
+            proof that authorizes the Delegator to execute these operations on your behalf.
+        </p>
+        
+        {{if .Session}}
+        <div class="session-info">
+            <h3>Registration Details</h3>
+            <table>
+                <tr>
+                    <td><strong>DID:</strong></td>
+                    <td><code>{{.Session.DID}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Filecoin Address:</strong></td>
+                    <td><code>{{.Session.FilecoinAddress}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Proof Set ID:</strong></td>
+                    <td><code>{{.Session.ProofSetID}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Operator Email:</strong></td>
+                    <td><code>{{.Session.OperatorEmail}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Fully Qualified Domain Name (FQDN):</strong></td>
+                    <td><code>{{.Session.FQDN}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Status:</strong></td>
+                    <td><span class="status-fqdn_verified">✅ {{.Session.Status}}</span></td>
+                </tr>
+            </table>
+        </div>
+        {{end}}
+        
+        <form action="/onboard/test-storage" method="post" class="onboard-form">
+            {{/* Use Session ID from various sources with priority */}}
+            <input type="hidden" name="session_id" value="{{if .Session}}{{.Session.SessionID}}{{else}}{{.SessionID}}{{end}}">
+            
+            <div class="form-group">
+                <label for="storage_test_proof" class="form-label">
+                    Storage Test Proof *
+                </label>
+                <textarea 
+                    id="storage_test_proof" 
+                    name="storage_test_proof" 
+                    class="form-textarea" 
+                    rows="10"
+                    placeholder="Paste your storage test proof here..."
+                    required
+                >{{.FormData.StorageTestProof}}</textarea>
+                <div class="form-help">
+                    Paste the storage test proof that authorizes the Delegator to execute blob/allocate and blob/accept 
+                    operations on your storage node. This proof will be used by the piri ucan server to validate authorization.
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Test Storage</button>
+                <a href="/onboard/new" class="btn btn-secondary">Start Over</a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="step-help">
+        <h3>Storage Testing</h3>
+        <p>
+            We will test your storage node's capabilities by performing blob/allocate and blob/accept operations.
+            This ensures your node can handle basic storage operations required for the Storacha network.
+        </p>
+        <details>
+            <summary>Required Capabilities</summary>
+            <ul>
+                <li><strong>blob/allocate:</strong> Reserves space for blob storage</li>
+                <li><strong>blob/accept:</strong> Confirms blob can be stored and retrieved from location commitment</li>
+            </ul>
+            <p>Both operations require a valid storage test proof that authorizes the Delegator to execute these operations.</p>
+        </details>
+        <details>
+            <summary>Storage Test Proof Requirements</summary>
+            <p>
+                The storage test proof must be a valid UCAN delegation that:
+            </p>
+            <ul>
+                <li>Is issued by your storage node DID</li>
+                <li>Authorizes the Delegator to execute blob/allocate and blob/accept capabilities</li>
+                <li>Is properly formatted as a base64-encoded string</li>
+            </ul>
+        </details>
+    </div>
+</div>
+{{end}}
+
+{{if eq .Step 4}}
+<div class="onboard-step">
+    <div class="step-content">
+        <h2>Step 4: Submit Delegation Proof</h2>
+        <p>
+            Your storage capabilities have been tested! Now submit your delegation proof to complete the onboarding process.
         </p>
         
         {{if .Session}}
@@ -324,7 +428,7 @@
 </div>
 {{end}}
 
-{{if eq .Step 4}}
+{{if eq .Step 5}}
 <div class="onboard-step">
     <div class="step-content success">
         <h2>Ready to Submit</h2>
@@ -367,7 +471,7 @@
 </div>
 {{end}}
 
-{{if eq .Step 5}}
+{{if eq .Step 6}}
 <div class="onboard-step">
     <div class="step-content success">
         <h2>🎉 Onboarding Complete!</h2>

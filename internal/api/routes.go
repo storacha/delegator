@@ -49,6 +49,7 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, sessionStore storage.Sessi
 			e.GET("/onboard/new", webHandler.NewOnboardingSession)
 			e.POST("/onboard/register-did", webHandler.RegisterDID)
 			e.POST("/onboard/register-fqdn", webHandler.RegisterFQDN)
+			e.POST("/onboard/test-storage", webHandler.TestStorage)
 			e.POST("/onboard/register-proof", webHandler.RegisterProof)
 			e.POST("/onboard/submit-provider", webHandler.SubmitProvider)
 			// Use path param only for session ID since we've removed query param support

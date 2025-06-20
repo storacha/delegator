@@ -304,11 +304,11 @@ func (s *Service) RegisterFQDN(sessionID string, fqdnURL url.URL) (*models.FQDNV
 }
 
 // TestStorage performs Step 3.4: Storage capability testing (blob/allocate and blob/accept)
-func (s *Service) TestStorage(sessionID string) (*models.StorageTestResponse, error) {
+func (s *Service) TestStorage(sessionID string, storageTestProof string) (*models.StorageTestResponse, error) {
 	startTime := time.Now()
 
 	// Debug log
-	log.Debugw("TestStorage called", "session_id", sessionID)
+	log.Debugw("TestStorage called", "session_id", sessionID, "has_storage_test_proof", storageTestProof != "")
 
 	// Get the session
 	session, err := s.sessionStore.GetSession(strings.TrimSpace(sessionID))
@@ -333,9 +333,17 @@ func (s *Service) TestStorage(sessionID string) (*models.StorageTestResponse, er
 			ErrInvalidSessionState, models.StatusFQDNVerified, session.Status)
 	}
 
-	// Use the stored delegation data directly
+	// Require user-provided storage test proof for storage authorization
+	if storageTestProof == "" {
+		return nil, fmt.Errorf("%w: storage test proof is required for storage testing", ErrInvalidSessionState)
+	}
+
+	// Use the user-provided storage test proof for storage testing
+	delegationForTesting := storageTestProof
+	log.Debugw("Using user-provided storage test proof for storage testing", "session_id", sessionID)
+
 	// Perform storage test
-	testResult, err := s.performStorageTest(session.FQDN, session.DID, session.DelegationData)
+	testResult, err := s.performStorageTest(session.FQDN, session.DID, delegationForTesting)
 	if err != nil {
 		// Record the test failure
 		session.StorageTestPassed = false

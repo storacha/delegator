@@ -32,12 +32,13 @@ type OnboardingTemplateData struct {
 
 // FormData represents form input data
 type FormData struct {
-	DID             string
-	FilecoinAddress string
-	ProofSetID      uint64
-	OperatorEmail   string
-	URL             string
-	Proof           string
+	DID              string
+	FilecoinAddress  string
+	ProofSetID       uint64
+	OperatorEmail    string
+	URL              string
+	StorageTestProof string // For storage testing
+	Proof            string // For final proof submission
 }
 
 // OnboardingIndex shows the onboarding flow based on step or session
@@ -77,13 +78,13 @@ func (h *WebHandler) OnboardingIndex(c echo.Context) error {
 
 	// Override step if explicitly provided
 	if stepParam != "" {
-		if step, err := strconv.Atoi(stepParam); err == nil && step >= 1 && step <= 5 {
+		if step, err := strconv.Atoi(stepParam); err == nil && step >= 1 && step <= 6 {
 			data.Step = step
 		}
 	}
 
-	// If we're on step 5 and have a valid session, populate the environment variables
-	if data.Step == 5 && data.Session != nil {
+	// If we're on step 6 and have a valid session, populate the environment variables
+	if data.Step == 6 && data.Session != nil {
 		data.PiriNodeEnvVars = h.generatePiriNodeEnvVars(data.Session)
 	}
 
@@ -309,8 +310,71 @@ func (h *WebHandler) RegisterFQDN(c echo.Context) error {
 	log.Debugw("RegisterFQDN: Success! Setting cookie with session ID", "session_id", resp.SessionID)
 	h.setSessionCookie(c, resp.SessionID)
 
-	// Success - redirect to step 3
+	// Success - redirect to step 3 (storage testing)
 	return c.Redirect(http.StatusSeeOther, "/onboard?step=3")
+}
+
+// TestStorage handles storage testing form submission
+func (h *WebHandler) TestStorage(c echo.Context) error {
+	// Try to get session ID from cookie first, then form value
+	sessionID := h.getSessionID(c)
+	if sessionID == "" {
+		sessionID = c.FormValue("session_id")
+	}
+
+	storageTestProof := c.FormValue("storage_test_proof")
+
+	data := &OnboardingTemplateData{
+		TemplateData: &TemplateData{
+			Title:     "WSP Onboarding",
+			SessionID: sessionID,
+		},
+		Step: 3,
+		FormData: &FormData{
+			StorageTestProof: storageTestProof,
+		},
+		HelpTexts: h.getHelpTexts(),
+	}
+
+	// Get session
+	if sessionID != "" {
+		session, err := h.sessionStore.GetSession(sessionID)
+		if err == nil {
+			data.Session = session
+		}
+	}
+
+	// Validate input
+	if sessionID == "" {
+		data.Error = "Session ID is required"
+		return h.render(c, "onboard.html", data)
+	}
+
+	if storageTestProof == "" {
+		data.Error = "Storage test proof is required for storage testing"
+		return h.render(c, "onboard.html", data)
+	}
+
+	// Test storage
+	_, err := h.service.TestStorage(sessionID, storageTestProof)
+	if err != nil {
+		if errors.Is(err, onboarding.ErrSessionNotFound) {
+			data.Error = "Session not found or expired"
+		} else if errors.Is(err, onboarding.ErrInvalidSessionState) {
+			data.Error = "Invalid session state - please start over"
+		} else if errors.Is(err, onboarding.ErrStorageTestFailed) {
+			data.Error = fmt.Sprintf("Storage test failed: %v", err)
+		} else {
+			data.Error = fmt.Sprintf("Storage testing failed: %v", err)
+		}
+		return h.render(c, "onboard.html", data)
+	}
+
+	// Save/update session ID in cookie
+	h.setSessionCookie(c, sessionID)
+
+	// Success - redirect to step 4 (proof submission)
+	return c.Redirect(http.StatusSeeOther, "/onboard?step=4")
 }
 
 // RegisterProof handles proof registration form submission
@@ -328,7 +392,7 @@ func (h *WebHandler) RegisterProof(c echo.Context) error {
 			Title:     "WSP Onboarding",
 			SessionID: sessionID,
 		},
-		Step: 3,
+		Step: 4,
 		FormData: &FormData{
 			Proof: proof,
 		},
@@ -373,7 +437,7 @@ func (h *WebHandler) RegisterProof(c echo.Context) error {
 	h.setSessionCookie(c, resp.SessionID)
 
 	// Success - redirect to completion page
-	return c.Redirect(http.StatusSeeOther, "/onboard?step=4")
+	return c.Redirect(http.StatusSeeOther, "/onboard?step=5")
 }
 
 // SessionStatus shows the status of an onboarding session
@@ -423,7 +487,7 @@ func (h *WebHandler) SubmitProvider(c echo.Context) error {
 			Title:     "WSP Onboarding",
 			SessionID: sessionID,
 		},
-		Step:      4,
+		Step:      5,
 		HelpTexts: h.getHelpTexts(),
 	}
 
@@ -432,9 +496,9 @@ func (h *WebHandler) SubmitProvider(c echo.Context) error {
 		session, err := h.sessionStore.GetSession(sessionID)
 		if err == nil {
 			data.Session = session
-			// Make sure step is 4 for proof verified status
+			// Make sure step is 5 for proof verified status
 			if session.Status == models.StatusProofVerified {
-				data.Step = 4
+				data.Step = 5
 			}
 		} else {
 			data.Error = "Session not found or expired"
@@ -466,8 +530,8 @@ func (h *WebHandler) SubmitProvider(c echo.Context) error {
 
 	data.Session = updatedSession
 
-	// Success - redirect to the final completion page (step 5)
-	return c.Redirect(http.StatusSeeOther, "/onboard?step=5")
+	// Success - redirect to the final completion page (step 6)
+	return c.Redirect(http.StatusSeeOther, "/onboard?step=6")
 }
 
 // GetDelegation serves the delegation file for download
@@ -518,10 +582,12 @@ func (h *WebHandler) getStepFromStatus(status string) int {
 		return 2
 	case models.StatusFQDNVerified:
 		return 3
-	case models.StatusProofVerified:
+	case models.StatusStorageTested:
 		return 4
-	case models.StatusCompleted:
+	case models.StatusProofVerified:
 		return 5
+	case models.StatusCompleted:
+		return 6
 	default:
 		return 1
 	}
@@ -532,6 +598,8 @@ func (h *WebHandler) getNextStepFromStatus(status string) string {
 	case models.StatusDIDVerified:
 		return "register-fqdn"
 	case models.StatusFQDNVerified:
+		return "test-storage"
+	case models.StatusStorageTested:
 		return "register-proof"
 	case models.StatusProofVerified:
 		return "submit-provider"

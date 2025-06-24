@@ -1,0 +1,141 @@
+{{define "content"}}
+<div class="onboard-header">
+    <h1>Test Storage</h1>
+    <div class="progress-bar">
+        <div class="progress-step completed">
+            <span class="step-number">1</span>
+            <span class="step-label">Node Details</span>
+        </div>
+        <div class="progress-step completed">
+            <span class="step-number">2</span>
+            <span class="step-label">Provide Delegation</span>
+        </div>
+        <div class="progress-step active">
+            <span class="step-number">3</span>
+            <span class="step-label">Test Storage</span>
+        </div>
+    </div>
+</div>
+
+<div class="onboard-step">
+    <div class="step-content">
+        <h2>Testing Your Storage Node</h2>
+        
+        <div class="test-progress">
+            <div class="progress-status" id="progress-status">
+                <div class="loading-bar-container">
+                    <div class="loading-bar" id="loading-bar" style="width: 0%"></div>
+                </div>
+                <p id="progress-percentage" class="progress-percentage">0%</p>
+                <p id="progress-message">Starting test...</p>
+                <p id="progress-details" class="progress-details"></p>
+            </div>
+        </div>
+
+        <div class="session-info">
+            <h3>Test Details</h3>
+            <table>
+                <tr>
+                    <td><strong>Node DID:</strong></td>
+                    <td><code>{{.TestSession.DID}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Node URL:</strong></td>
+                    <td><code>{{.TestSession.FQDN}}</code></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.test-progress {
+    margin: 2rem 0;
+    padding: 2rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-status {
+    text-align: center;
+    width: 100%;
+    max-width: 500px;
+}
+
+.loading-bar-container {
+    width: 100%;
+    height: 20px;
+    background-color: #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0 auto 1rem;
+}
+
+.loading-bar {
+    height: 100%;
+    background-color: #6366f1;
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.progress-percentage {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #6366f1;
+    margin: 0.5rem 0;
+}
+
+#progress-message {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0.5rem 0;
+}
+
+#progress-details {
+    color: #666;
+    font-size: 0.875rem;
+}
+</style>
+
+<script>
+// Poll for progress updates
+const testSessionId = '{{.TestSessionID}}';
+let pollInterval;
+
+function updateProgress() {
+    fetch(`/api/v1/test-storage/progress?test_session_id=${testSessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.progress) {
+                document.getElementById('progress-message').textContent = data.progress.message || 'Processing...';
+                document.getElementById('progress-details').textContent = data.progress.details || '';
+                
+                // Update loading bar
+                const percentage = data.progress.percentage || 0;
+                document.getElementById('loading-bar').style.width = percentage + '%';
+                document.getElementById('progress-percentage').textContent = percentage + '%';
+            }
+            
+            // Check if test is completed or failed
+            if (data.status === 'test_storage_completed' || data.status === 'test_storage_failed') {
+                clearInterval(pollInterval);
+                // Redirect to results page
+                window.location.href = `/test-storage/progress?test_session_id=${testSessionId}`;
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching progress:', err);
+        });
+}
+
+// Start polling
+pollInterval = setInterval(updateProgress, 1000);
+
+// Initial update
+updateProgress();
+</script>
+{{end}}

@@ -30,6 +30,7 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, sessionStore storage.Sessi
 	e.GET("/health", healthCheck)
 
 	// Try to set up web UI - if templates are available
+	var webHandler *handlers.WebHandler
 	templatesDir := filepath.Join("web", "templates")
 	// Log templates directory path for debugging
 	fmt.Printf("Looking for templates in: %s\n", templatesDir)
@@ -41,7 +42,7 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, sessionStore storage.Sessi
 		e.Static("/static", "web/static")
 
 		// Initialize web handlers
-		webHandler, err := handlers.NewWebHandler(templatesDir, sessionStore, persistedStore, cfg)
+		webHandler, err = handlers.NewWebHandler(templatesDir, sessionStore, persistedStore, cfg)
 		if err == nil {
 			// Web UI routes (HTML pages)
 			e.GET("/", webHandler.Home)
@@ -55,6 +56,13 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, sessionStore storage.Sessi
 			e.GET("/onboard/status/:session_id", webHandler.SessionStatus)
 			e.GET("/onboard/status", webHandler.SessionStatus) // Will use cookie
 			e.GET("/onboard/delegation/:session_id", webHandler.GetDelegation)
+
+			// Test storage routes
+			e.GET("/test-storage", webHandler.TestStorageDID)
+			e.POST("/test-storage/did", webHandler.TestStorageDIDSubmit)
+			e.GET("/test-storage/delegation", webHandler.TestStorageDelegation)
+			e.POST("/test-storage/delegation", webHandler.TestStorageDelegationSubmit)
+			e.GET("/test-storage/progress", webHandler.TestStorageProgress)
 		} else {
 			// Web handler failed, provide basic root route
 			e.GET("/", func(c echo.Context) error {
@@ -95,6 +103,11 @@ func RegisterRoutes(e *echo.Echo, cfg *config.Config, sessionStore storage.Sessi
 	onboard.POST("/submit-provider", onboardingHandler.submitProvider)
 	onboard.GET("/status/:session_id", onboardingHandler.getSessionStatus)
 	onboard.GET("/delegation/:session_id", onboardingHandler.getDelegation)
+
+	// Test storage API route - add inside the webHandler check
+	if webHandler != nil {
+		v1.GET("/test-storage/progress", webHandler.TestStorageProgressAPI)
+	}
 
 	return nil
 }

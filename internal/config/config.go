@@ -231,7 +231,7 @@ func validate(config *Config) error {
 		errs = multierror.Append(errs, fmt.Errorf("invalid log level: %s, must be one of: debug, info, warn, error", config.Log.Level))
 	}
 
-	// Validate dynamo config
+	// Validate dynamo config, if not in dev mode
 	if config.Dynamo.Region == "" {
 		errs = multierror.Append(errs, fmt.Errorf("dynamo.region is required"))
 	}
@@ -243,6 +243,5 @@ func validate(config *Config) error {
 	if config.Dynamo.ProviderInfoTableName == "" {
 		errs = multierror.Append(errs, fmt.Errorf("dynamo.provider_info_table_name is required"))
 	}
-
 	return errs
 }

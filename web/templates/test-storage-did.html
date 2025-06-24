@@ -1,0 +1,95 @@
+{{define "content"}}
+<div class="onboard-header">
+    <h1>Test Storage</h1>
+    <div class="progress-bar">
+        <div class="progress-step active">
+            <span class="step-number">1</span>
+            <span class="step-label">Node Details</span>
+        </div>
+        <div class="progress-step">
+            <span class="step-number">2</span>
+            <span class="step-label">Provide Delegation</span>
+        </div>
+        <div class="progress-step">
+            <span class="step-number">3</span>
+            <span class="step-label">Test Storage</span>
+        </div>
+    </div>
+</div>
+
+<div class="onboard-step">
+    <div class="step-content">
+        <h2>Step 1: Enter Your Node Details</h2>
+        <p class="step-intro">
+            Enter your node's DID and URL to begin the storage test.
+        </p>
+
+        <form action="/test-storage/did" method="post" class="onboard-form">
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="did" class="form-label">
+                        DID (Decentralized Identifier)
+                        <span class="required">*</span>
+                    </label>
+                    <input
+                            type="text"
+                            id="did"
+                            name="did"
+                            class="form-input"
+                            placeholder="did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"
+                            value="{{.FormData.DID}}"
+                            required
+                            pattern="did:key:.*"
+                            title="DID must start with 'did:key:'"
+                    >
+                    <div class="form-help">
+                        <span class="help-label">Format:</span> Must start with <code>did:key:</code> followed by your identifier
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="url" class="form-label">
+                        Storage Node URL
+                        <span class="required">*</span>
+                    </label>
+                    <input 
+                        type="url" 
+                        id="url" 
+                        name="url" 
+                        class="form-input" 
+                        placeholder="https://your-storage-node.example.com"
+                        value="{{.FormData.URL}}"
+                        required
+                    >
+                    <div class="form-help">
+                        Enter the full URL where your storage node can be reached. It should respond with your DID.
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Continue</button>
+                <a href="/" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="step-help">
+        <h3>Need Help?</h3>
+        <div class="help-card">
+            <h4>What is a DID?</h4>
+            <p>
+                A DID (Decentralized Identifier) is your unique, cryptographic identity on the network that you control without relying on centralized authorities.
+            </p>
+        </div>
+
+        <details class="help-details">
+            <summary>{{.HelpTexts.DIDGeneration.Title}}</summary>
+            <p>{{.HelpTexts.DIDGeneration.Description}}</p>
+            {{if .HelpTexts.DIDGeneration.Command}}
+            <pre><code>{{.HelpTexts.DIDGeneration.Command}}</code></pre>
+            {{end}}
+        </details>
+    </div>
+</div>
+{{end}}

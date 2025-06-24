@@ -1,0 +1,189 @@
+{{define "content"}}
+<div class="onboard-header">
+    <h1>Test Storage</h1>
+    <div class="progress-bar">
+        <div class="progress-step completed">
+            <span class="step-number">1</span>
+            <span class="step-label">Node Details</span>
+        </div>
+        <div class="progress-step completed">
+            <span class="step-number">2</span>
+            <span class="step-label">Provide Delegation</span>
+        </div>
+        <div class="progress-step active">
+            <span class="step-number">3</span>
+            <span class="step-label">Test Storage</span>
+        </div>
+    </div>
+</div>
+
+<div class="onboard-step">
+    <div class="step-content {{if .Success}}success{{else}}error{{end}}">
+        {{if .Success}}
+        <h2>🎉 Storage Test Successful!</h2>
+        <p>
+            Your storage test has completed successfully. Your node is properly configured and ready to provide storage services.
+        </p>
+        
+        {{if .TestProgress}}
+            {{if .TestProgress.DownloadURL}}
+            <div class="download-section">
+                <h3>📥 Download Your Test Data</h3>
+                <p>Your test data has been successfully stored and is available for download:</p>
+                <div class="download-link-container">
+                    <a href="{{.TestProgress.DownloadURL}}" target="_blank" class="download-link">{{.TestProgress.DownloadURL}}</a>
+                </div>
+            </div>
+            {{end}}
+        {{end}}
+        {{else}}
+        <h2>❌ Storage Test Failed</h2>
+        <p>
+            The storage test encountered an error. Please review the details below and try again.
+        </p>
+        {{end}}
+        
+        {{if .TestSession}}
+        <div class="session-info {{if .Success}}success{{else}}error{{end}}">
+            <h3>Test Details</h3>
+            <table>
+                <tr>
+                    <td><strong>DID:</strong></td>
+                    <td><code>{{.TestSession.DID}}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Status:</strong></td>
+                    <td><span class="status-{{if .Success}}completed{{else}}error{{end}}">{{if .Success}}✅ Success{{else}}❌ Failed{{end}}</span></td>
+                </tr>
+                {{if .TestError}}
+                <tr>
+                    <td><strong>Error:</strong></td>
+                    <td class="error-message">{{.TestError}}</td>
+                </tr>
+                {{end}}
+            </table>
+            
+            {{if .Success}}
+            <h3 style="margin-top: 2rem;">Upload Statistics</h3>
+            <div class="stats-container" id="stats-container">
+                <div class="stat-item">
+                    <div class="stat-label">Upload Size</div>
+                    <div class="stat-value" id="upload-size">--</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Average Speed</div>
+                    <div class="stat-value" id="avg-speed">--</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Upload Duration</div>
+                    <div class="stat-value" id="upload-duration">--</div>
+                </div>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+        
+        <div class="form-actions">
+            <a href="/" class="btn btn-primary">Return to Dashboard</a>
+            <a href="/test-storage" class="btn btn-secondary">Test Again</a>
+        </div>
+    </div>
+</div>
+
+<style>
+.download-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background-color: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+}
+
+.download-section h3 {
+    margin-top: 0;
+    color: #0369a1;
+}
+
+.download-link-container {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: white;
+    border: 1px solid #e0e7ff;
+    border-radius: 4px;
+    word-break: break-all;
+}
+
+.download-link {
+    color: #4f46e5;
+    text-decoration: none;
+    font-family: monospace;
+    font-size: 0.875rem;
+}
+
+.download-link:hover {
+    text-decoration: underline;
+}
+</style>
+
+<style>
+.stats-container {
+    display: flex;
+    gap: 2rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    flex: 1;
+    min-width: 150px;
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #1f2937;
+}
+</style>
+
+<script>
+// Parse and display test statistics
+if ({{.Success}} && {{if .TestResult}}true{{else}}false{{end}}) {
+    try {
+        const statsJSON = {{.TestResult}};
+        const stats = JSON.parse(statsJSON);
+        
+        // Update upload size
+        document.getElementById('upload-size').textContent = stats.upload_size_mb + ' MB';
+        
+        // Update average speed
+        document.getElementById('avg-speed').textContent = stats.avg_speed_gbps.toFixed(3) + ' Gbps';
+        
+        // Update upload duration
+        const duration = Math.round(stats.upload_duration_seconds);
+        const minutes = Math.floor(duration / 60);
+        const seconds = duration % 60;
+        let durationText = '';
+        if (minutes > 0) {
+            durationText = minutes + 'm ' + seconds + 's';
+        } else {
+            durationText = seconds + ' seconds';
+        }
+        document.getElementById('upload-duration').textContent = durationText;
+    } catch (e) {
+        console.error('Failed to parse test statistics:', e);
+    }
+}
+</script>
+{{end}}

@@ -548,7 +548,7 @@ func (h *WebHandler) generatePiriNodeEnvVars(session *models.OnboardingSession) 
 
 	// Add session-specific values
 	envVars["PIRI_PUBLIC_URL"] = session.FQDN
-	envVars["PIRI_PDP_PROOFSET"] = strconv.FormatUint(session.ProofSetID, 10)
+	envVars["PIRI_PROOF_SET"] = strconv.FormatUint(session.ProofSetID, 10)
 	envVars["PIRI_INDEXING_SERVICE_PROOF"] = session.DelegationData
 
 	// Add any additional environment variables from the config

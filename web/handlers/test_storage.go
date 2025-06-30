@@ -43,7 +43,7 @@ func (h *WebHandler) TestStorageDID(c echo.Context) error {
 
 	// Create help texts with test storage specific info
 	testHelpTexts := *h.helpTexts
-	testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegation generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegation generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
+	testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegate generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegate generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
 
 	data := &TestStorageTemplateData{
 		TemplateData: &TemplateData{
@@ -68,7 +68,7 @@ func (h *WebHandler) TestStorageDIDSubmit(c echo.Context) error {
 	if !strings.HasPrefix(didStr, "did:key:") {
 		// Create help texts with test storage specific info
 		testHelpTexts := *h.helpTexts
-		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegation generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegation generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
+		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegate generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegate generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
 
 		data := &TestStorageTemplateData{
 			TemplateData: &TemplateData{
@@ -90,7 +90,7 @@ func (h *WebHandler) TestStorageDIDSubmit(c echo.Context) error {
 	if urlStr == "" {
 		// Create help texts with test storage specific info
 		testHelpTexts := *h.helpTexts
-		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegation generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegation generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
+		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegate generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegate generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
 
 		data := &TestStorageTemplateData{
 			TemplateData: &TemplateData{
@@ -113,7 +113,7 @@ func (h *WebHandler) TestStorageDIDSubmit(c echo.Context) error {
 	if err != nil {
 		// Create help texts with test storage specific info
 		testHelpTexts := *h.helpTexts
-		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegation generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegation generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
+		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegate generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegate generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
 
 		data := &TestStorageTemplateData{
 			TemplateData: &TemplateData{
@@ -136,7 +136,7 @@ func (h *WebHandler) TestStorageDIDSubmit(c echo.Context) error {
 	if err != nil {
 		// Create help texts with test storage specific info
 		testHelpTexts := *h.helpTexts
-		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegation generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegation generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
+		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegate generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegate generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
 
 		data := &TestStorageTemplateData{
 			TemplateData: &TemplateData{
@@ -183,7 +183,7 @@ func (h *WebHandler) TestStorageDelegation(c echo.Context) error {
 
 	// Create help texts with test storage specific info
 	testHelpTexts := *h.helpTexts
-	testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegation generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegation generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
+	testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegate generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegate generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
 
 	data := &TestStorageTemplateData{
 		TemplateData: &TemplateData{
@@ -229,7 +229,7 @@ func (h *WebHandler) TestStorageDelegationSubmit(c echo.Context) error {
 	if dlg == "" {
 		// Create help texts with test storage specific info
 		testHelpTexts := *h.helpTexts
-		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegation generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegation generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
+		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegate generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegate generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
 
 		data := &TestStorageTemplateData{
 			TemplateData: &TemplateData{
@@ -258,7 +258,7 @@ func (h *WebHandler) TestStorageDelegationSubmit(c echo.Context) error {
 	if err := h.sessionStore.UpdateSession(session); err != nil {
 		// Create help texts with test storage specific info
 		testHelpTexts := *h.helpTexts
-		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegation generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegation generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
+		testHelpTexts.DelegationProof.Command = fmt.Sprintf("# Using the key file you saved during setup (either PEM or JSON format):\npiri delegate generate \\\n  --key-file=service.pem \\\n  --client-did=%s\n\n# If you saved your key as JSON instead of PEM:\npiri delegate generate \\\n  --key-file=service.json \\\n  --client-did=%s", h.service.GetDelegatorDID(), h.service.GetDelegatorDID())
 
 		data := &TestStorageTemplateData{
 			TemplateData: &TemplateData{

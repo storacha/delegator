@@ -29,6 +29,6 @@ var DefaultOnboardingHelpTexts = OnboardingHelpTexts{
 	DelegationProof: HelpText{
 		Title:       "How to generate",
 		Description: "Generate a delegation proof using the piri CLI and your DID's private key file that you saved during setup{{if .ServiceDid}} (use the indexer DID: {{.ServiceDid}}){{end}}:",
-		Command:     "# Using the key file you saved during setup (either PEM or JSON format):\npiri delegation generate \\\n  --key-file=service.pem \\\n  --client-did={{.ServiceDid}}\n\n# If you saved your key as JSON instead of PEM:\npiri delegation generate \\\n  --key-file=service.json \\\n  --client-did={{if .ServiceDid}}{{.ServiceDid}}{{else}}<indexer-did>{{end}}",
+		Command:     "# Using the key file you saved during setup (either PEM or JSON format):\npiri delegate generate \\\n  --key-file=service.pem \\\n  --client-did={{.ServiceDid}}\n\n# If you saved your key as JSON instead of PEM:\npiri delegate generate \\\n  --key-file=service.json \\\n  --client-did={{if .ServiceDid}}{{.ServiceDid}}{{else}}<indexer-did>{{end}}",
 	},
 }

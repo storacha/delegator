@@ -16,6 +16,10 @@ type OnboardingSession struct {
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 	ExpiresAt       time.Time `json:"expires_at" db:"expires_at"`
+	// TestProgress is used to track progress during storage tests
+	TestProgress string `json:"test_progress,omitempty" db:"test_progress"`
+	// TestResult stores the final result of a test
+	TestResult string `json:"test_result,omitempty" db:"test_result"`
 }
 
 // OnboardingSession status constants
@@ -117,4 +121,13 @@ type OnboardingStatusResponse struct {
 	CreatedAt       string `json:"created_at"`
 	ExpiresAt       string `json:"expires_at"`
 	NextStep        string `json:"next_step,omitempty"`
+}
+
+// TestProgress represents the progress of a storage test
+type TestProgress struct {
+	Step        string `json:"step"`
+	Message     string `json:"message"`
+	Details     string `json:"details,omitempty"`
+	DownloadURL string `json:"download_url,omitempty"`
+	Percentage  int    `json:"percentage"`
 }

@@ -172,14 +172,21 @@ func (h *WebHandler) render(c echo.Context, templateName string, data interface{
 
 // getSessionID gets the session ID from cookie only
 func (h *WebHandler) getSessionID(c echo.Context) string {
+	return h.getSessionIDByType(c, "onboarding")
+}
+
+// getSessionIDByType gets the session ID for a specific session type
+func (h *WebHandler) getSessionIDByType(c echo.Context, sessionType string) string {
 	// Get session ID from cookie
 	sess, err := session.Get("delegator_session", c)
 	if err != nil {
 		return ""
 	}
 
-	if sess.Values["session_id"] != nil {
-		if sessionID, ok := sess.Values["session_id"].(string); ok && sessionID != "" {
+	// Use different keys for different session types
+	key := sessionType + "_session_id"
+	if sess.Values[key] != nil {
+		if sessionID, ok := sess.Values[key].(string); ok && sessionID != "" {
 			return sessionID
 		}
 	}
@@ -189,6 +196,11 @@ func (h *WebHandler) getSessionID(c echo.Context) string {
 
 // setSessionCookie saves the session ID to a cookie
 func (h *WebHandler) setSessionCookie(c echo.Context, sessionID string) {
+	h.setSessionCookieByType(c, sessionID, "onboarding")
+}
+
+// setSessionCookieByType saves the session ID for a specific session type
+func (h *WebHandler) setSessionCookieByType(c echo.Context, sessionID string, sessionType string) {
 	if sessionID == "" {
 		return
 	}
@@ -212,39 +224,57 @@ func (h *WebHandler) setSessionCookie(c echo.Context, sessionID string) {
 		SameSite: http.SameSiteLaxMode,
 	}
 
-	// Set session ID
-	sess.Values["session_id"] = sessionID
+	// Use different keys for different session types
+	key := sessionType + "_session_id"
+	sess.Values[key] = sessionID
 
 	// Save session
 	err = sess.Save(c.Request(), c.Response())
 	if err != nil {
-		log.Errorw("Error saving session cookie", "error", err)
+		log.Errorw("Error saving session cookie", "error", err, "sessionType", sessionType)
 	}
 }
 
 // clearSessionCookie removes the session cookie
 func (h *WebHandler) clearSessionCookie(c echo.Context) {
+	h.clearSessionCookieByType(c, "onboarding")
+}
+
+// clearSessionCookieByType removes the session cookie for a specific session type
+func (h *WebHandler) clearSessionCookieByType(c echo.Context, sessionType string) {
 	sess, err := session.Get("delegator_session", c)
 	if err != nil {
 		return
 	}
 
-	// Set session options for deletion (expired)
-	sess.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   -1, // Negative value means delete cookie
-		HttpOnly: true,
-		Secure:   c.Request().TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	}
+	// Remove session ID for specific type
+	key := sessionType + "_session_id"
+	delete(sess.Values, key)
 
-	// Remove session ID
-	delete(sess.Values, "session_id")
+	// If no more sessions, clear the entire cookie
+	if len(sess.Values) == 0 {
+		// Set session options for deletion (expired)
+		sess.Options = &sessions.Options{
+			Path:     "/",
+			MaxAge:   -1, // Negative value means delete cookie
+			HttpOnly: true,
+			Secure:   c.Request().TLS != nil,
+			SameSite: http.SameSiteLaxMode,
+		}
+	} else {
+		// Otherwise just update the session
+		sess.Options = &sessions.Options{
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   c.Request().TLS != nil,
+			SameSite: http.SameSiteLaxMode,
+		}
+	}
 
 	// Save the session to apply changes
 	err = sess.Save(c.Request(), c.Response())
 	if err != nil {
-		log.Errorw("Error clearing session cookie", "error", err)
+		log.Errorw("Error clearing session cookie", "error", err, "sessionType", sessionType)
 	}
 }
 

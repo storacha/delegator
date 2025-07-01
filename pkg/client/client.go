@@ -1,360 +1,232 @@
-// Package client provides a Go client for the Delegator API.
-//
-// The client abstracts HTTP communication with the delegator service and provides
-// methods that correspond to the onboarding workflow: DID verification, FQDN
-// verification, proof submission, and status checking.
 package client
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
-	"path"
-	"strings"
-	"time"
 
-	"github.com/storacha/delegator/internal/models"
+	"github.com/ipld/go-ipld-prime/datamodel"
+	"github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/capabilities/assert"
+	"github.com/storacha/go-libstoracha/capabilities/blob"
+	"github.com/storacha/go-libstoracha/capabilities/pdp"
+	"github.com/storacha/go-libstoracha/capabilities/types"
+	"github.com/storacha/go-libstoracha/piece/piece"
+	"github.com/storacha/go-ucanto/client"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	fdm "github.com/storacha/go-ucanto/core/result/failure/datamodel"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/principal"
+	uhttp "github.com/storacha/go-ucanto/transport/http"
+	"github.com/storacha/go-ucanto/ucan"
 )
 
-// Client represents a delegator API client.
+var ErrNoReceipt = errors.New("no error for invocation")
+var ErrIncorrectCapability = errors.New("did not receive expected capability")
+
+type Config struct {
+	ID principal.Signer
+	// StorageNodeID is the DID of the storage node.
+	StorageNodeID ucan.Principal
+	// StorageNodeURL is the URL of the storage node UCAN endpoint.
+	StorageNodeURL url.URL
+	// StorageProof is a delegation allowing the upload service to invoke
+	// blob/allocate and blob/accept on the storage node.
+	StorageProof delegation.Proof
+}
+
+// Client simulates actions taken by the upload service in response to
+// client invocations.
 type Client struct {
-	httpClient *http.Client
-	baseURL    string
-	userAgent  string
+	cfg  Config
+	conn client.Connection
 }
 
-// Option configures a Client.
-type Option func(*Client)
-
-// WithHTTPClient sets a custom HTTP client.
-func WithHTTPClient(client *http.Client) Option {
-	return func(c *Client) {
-		c.httpClient = client
-	}
-}
-
-// WithTimeout sets the HTTP client timeout.
-func WithTimeout(timeout time.Duration) Option {
-	return func(c *Client) {
-		c.httpClient.Timeout = timeout
-	}
-}
-
-// WithUserAgent sets a custom user agent.
-func WithUserAgent(userAgent string) Option {
-	return func(c *Client) {
-		c.userAgent = userAgent
-	}
-}
-
-// New creates a new delegator API client.
-func New(baseURL string, opts ...Option) (*Client, error) {
-	if baseURL == "" {
-		return nil, fmt.Errorf("base URL cannot be empty")
-	}
-
-	// Validate and normalize base URL
-	u, err := url.Parse(baseURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid base URL: %w", err)
-	}
-
-	if u.Scheme == "" {
-		u.Scheme = "http"
-	}
-
-	c := &Client{
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+// BlobAllocate sends a blob/allocate invocation to the storage node and returns the
+// upload address if required (i.e. it may be nil if the storage node already
+// has the blob).
+func (s *Client) BlobAllocate(space did.DID, digest multihash.Multihash, size uint64, cause datamodel.Link) (*blob.Address, error) {
+	inv, err := blob.Allocate.Invoke(
+		s.cfg.ID,
+		s.cfg.StorageNodeID,
+		s.cfg.StorageNodeID.DID().String(),
+		blob.AllocateCaveats{
+			Space: space,
+			Blob: types.Blob{
+				Digest: digest,
+				Size:   size,
+			},
+			Cause: cause,
 		},
-		baseURL:   strings.TrimSuffix(u.String(), "/"),
-		userAgent: "delegator-client/1.0",
-	}
-
-	for _, opt := range opts {
-		opt(c)
-	}
-
-	return c, nil
-}
-
-// HealthCheck checks if the delegator service is healthy.
-func (c *Client) HealthCheck(ctx context.Context) error {
-	req, err := c.newRequest(ctx, http.MethodGet, "/health", nil)
+		delegation.WithProof(s.cfg.StorageProof),
+	)
 	if err != nil {
-		return fmt.Errorf("creating health check request: %w", err)
+		return nil, fmt.Errorf("generating invocation: %w", err)
 	}
-
-	resp, err := c.httpClient.Do(req)
+	res, err := client.Execute([]invocation.Invocation{inv}, s.conn)
 	if err != nil {
-		return fmt.Errorf("health check request failed: %w", err)
+		return nil, fmt.Errorf("sending invocation: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("service unhealthy: status %d", resp.StatusCode)
-	}
-
-	return nil
-}
-
-// RegisterDID registers a DID and initiates the onboarding process.
-// Returns the session ID and delegation download URL.
-func (c *Client) RegisterDID(ctx context.Context, did string) (*models.DIDVerifyResponse, error) {
-	return c.RegisterDIDWithOptions(ctx, did, "", 0, "")
-}
-
-// RegisterDIDWithOptions registers a DID with additional information and initiates the onboarding process.
-// Returns the session ID and delegation download URL.
-func (c *Client) RegisterDIDWithOptions(ctx context.Context, did string, filecoinAddress string, proofSetID uint64, operatorEmail string) (*models.DIDVerifyResponse, error) {
-	if did == "" {
-		return nil, fmt.Errorf("DID cannot be empty")
-	}
-
-	req := models.DIDRegisterRequest{
-		DID:             did,
-		FilecoinAddress: filecoinAddress,
-		ProofSetID:      proofSetID,
-		OperatorEmail:   operatorEmail,
-	}
-
-	var resp models.DIDVerifyResponse
-	if err := c.doRequest(ctx, http.MethodPost, "/api/v1/onboard/register-did", req, &resp); err != nil {
-		return nil, fmt.Errorf("registering DID: %w", err)
-	}
-
-	return &resp, nil
-}
-
-// RegisterFQDN registers and verifies an FQDN for the given session.
-func (c *Client) RegisterFQDN(ctx context.Context, sessionID, fqdnURL string) (*models.FQDNVerifyResponse, error) {
-	if sessionID == "" {
-		return nil, fmt.Errorf("session ID cannot be empty")
-	}
-	if fqdnURL == "" {
-		return nil, fmt.Errorf("FQDN URL cannot be empty")
-	}
-
-	req := models.FQDNRegisterRequest{
-		SessionID: sessionID,
-		URL:       fqdnURL,
-	}
-
-	var resp models.FQDNVerifyResponse
-	if err := c.doRequest(ctx, http.MethodPost, "/api/v1/onboard/register-fqdn", req, &resp); err != nil {
-		return nil, fmt.Errorf("registering FQDN: %w", err)
-	}
-
-	return &resp, nil
-}
-
-// RegisterProof submits a proof delegation to complete the onboarding process.
-func (c *Client) RegisterProof(ctx context.Context, sessionID, proof string) (*models.ProofVerifyResponse, error) {
-	if sessionID == "" {
-		return nil, fmt.Errorf("session ID cannot be empty")
-	}
-	if proof == "" {
-		return nil, fmt.Errorf("proof cannot be empty")
-	}
-
-	req := models.ProofRegisterRequest{
-		SessionID: sessionID,
-		Proof:     proof,
-	}
-
-	var resp models.ProofVerifyResponse
-	if err := c.doRequest(ctx, http.MethodPost, "/api/v1/onboard/register-proof", req, &resp); err != nil {
-		return nil, fmt.Errorf("registering proof: %w", err)
-	}
-
-	return &resp, nil
-}
-
-// GetStatus retrieves the status of an onboarding session.
-func (c *Client) GetStatus(ctx context.Context, sessionID string) (*models.OnboardingStatusResponse, error) {
-	if sessionID == "" {
-		return nil, fmt.Errorf("session ID cannot be empty")
-	}
-
-	endpoint := fmt.Sprintf("/api/v1/onboard/status/%s", sessionID)
-
-	var resp models.OnboardingStatusResponse
-	if err := c.doRequest(ctx, http.MethodGet, endpoint, nil, &resp); err != nil {
-		return nil, fmt.Errorf("getting session status: %w", err)
-	}
-
-	return &resp, nil
-}
-
-// DownloadDelegation downloads the delegation file for a session.
-// Returns the delegation content as bytes.
-func (c *Client) DownloadDelegation(ctx context.Context, sessionID string) ([]byte, error) {
-	if sessionID == "" {
-		return nil, fmt.Errorf("session ID cannot be empty")
-	}
-
-	endpoint := fmt.Sprintf("/api/v1/onboard/delegation/%s", sessionID)
-
-	req, err := c.newRequest(ctx, http.MethodGet, endpoint, nil)
+	reader, err := receipt.NewReceiptReaderFromTypes[blob.AllocateOk, fdm.FailureModel](blob.AllocateOkType(), fdm.FailureType(), types.Converters...)
 	if err != nil {
-		return nil, fmt.Errorf("creating delegation download request: %w", err)
+		return nil, fmt.Errorf("generating receipt reader: %w", err)
 	}
-
-	resp, err := c.httpClient.Do(req)
+	rcptLink, ok := res.Get(inv.Link())
+	if !ok {
+		return nil, ErrNoReceipt
+	}
+	rcpt, err := reader.Read(rcptLink, res.Blocks())
 	if err != nil {
-		return nil, fmt.Errorf("downloading delegation: %w", err)
+		return nil, fmt.Errorf("reading receipt: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
-	data, err := io.ReadAll(resp.Body)
+	alloc, err := result.Unwrap(result.MapError(rcpt.Out(), failure.FromFailureModel))
 	if err != nil {
-		return nil, fmt.Errorf("reading delegation content: %w", err)
+		return nil, fmt.Errorf("received error from storage node: %w", err)
 	}
-
-	return data, nil
+	return alloc.Address, nil
 }
 
-// doRequest performs an HTTP request with JSON serialization/deserialization.
-func (c *Client) doRequest(ctx context.Context, method, endpoint string, body interface{}, result interface{}) error {
-	var reqBody io.Reader
-	if body != nil {
-		data, err := json.Marshal(body)
+// Blob sends a blob/accept invocation to the storage node and
+// returns the location commitment and piece/accept invocation
+type BlobAcceptResult struct {
+	LocationCommitment assert.LocationCaveats
+	PDPAccept          *pdp.AcceptCaveats
+}
+
+func (s *Client) BlobAccept(space did.DID, digest multihash.Multihash, size uint64, putInv datamodel.Link) (*BlobAcceptResult, error) {
+
+	inv, err := blob.Accept.Invoke(
+		s.cfg.ID,
+		s.cfg.StorageNodeID,
+		s.cfg.StorageNodeID.DID().String(),
+		blob.AcceptCaveats{
+			Space: space,
+			Blob: types.Blob{
+				Digest: digest,
+				Size:   size,
+			},
+			Put: blob.Promise{
+				UcanAwait: blob.Await{
+					Selector: ".out.ok",
+					Link:     putInv,
+				},
+			},
+		},
+		delegation.WithProof(s.cfg.StorageProof),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("generating invocation: %w", err)
+	}
+
+	res, err := client.Execute([]invocation.Invocation{inv}, s.conn)
+	if err != nil {
+		return nil, fmt.Errorf("sending invocation: %w", err)
+	}
+
+	reader, err := receipt.NewReceiptReaderFromTypes[blob.AcceptOk, fdm.FailureModel](blob.AcceptOkType(), fdm.FailureType(), types.Converters...)
+	if err != nil {
+		return nil, fmt.Errorf("generating receipt reader: %w", err)
+	}
+
+	rcptLink, ok := res.Get(inv.Link())
+	if !ok {
+		return nil, ErrNoReceipt
+	}
+
+	rcpt, err := reader.Read(rcptLink, res.Blocks())
+	if err != nil {
+		return nil, fmt.Errorf("reading receipt: %w", err)
+	}
+
+	acc, err := result.Unwrap(result.MapError(rcpt.Out(), failure.FromFailureModel))
+	if err != nil {
+		return nil, fmt.Errorf("received error from storage node: %w", err)
+	}
+
+	br, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(res.Blocks()))
+	if err != nil {
+		return nil, fmt.Errorf("setting up block reader: %w", err)
+	}
+
+	claim, err := delegation.NewDelegationView(acc.Site, br)
+	if err != nil {
+		return nil, fmt.Errorf("reading claim delegation: %w", err)
+	}
+	if len(claim.Capabilities()) != 1 || claim.Capabilities()[0].Can() != assert.LocationAbility {
+		return nil, ErrIncorrectCapability
+	}
+
+	lc, err := assert.LocationCaveatsReader.Read(claim.Capabilities()[0].Nb())
+	if err != nil {
+		return nil, fmt.Errorf("decoding location commitment: %w", err)
+	}
+	result := &BlobAcceptResult{
+		LocationCommitment: lc,
+	}
+	if acc.PDP != nil {
+		pdpAccept, err := delegation.NewDelegationView(*acc.PDP, br)
 		if err != nil {
-			return fmt.Errorf("marshaling request body: %w", err)
+			return nil, fmt.Errorf("reading piece accept invocation: %w", err)
 		}
-		reqBody = bytes.NewReader(data)
-	}
-
-	req, err := c.newRequest(ctx, method, endpoint, reqBody)
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("executing request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		return c.handleErrorResponse(resp)
-	}
-
-	// For successful responses, decode into the API response wrapper
-	var apiResp models.APIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		return fmt.Errorf("decoding response: %w", err)
-	}
-
-	if !apiResp.Success {
-		return fmt.Errorf("API error: %s", apiResp.Error)
-	}
-
-	// Re-marshal and unmarshal to convert the data to the expected type
-	if result != nil && apiResp.Data != nil {
-		data, err := json.Marshal(apiResp.Data)
+		if len(pdpAccept.Capabilities()) != 1 || pdpAccept.Capabilities()[0].Can() != pdp.AcceptAbility {
+			return nil, ErrIncorrectCapability
+		}
+		ac, err := pdp.AcceptCaveatsReader.Read(pdpAccept.Capabilities()[0].Nb())
 		if err != nil {
-			return fmt.Errorf("marshaling response data: %w", err)
+			return nil, fmt.Errorf("decoding location commitment: %w", err)
 		}
-
-		if err := json.Unmarshal(data, result); err != nil {
-			return fmt.Errorf("unmarshaling response data: %w", err)
-		}
+		result.PDPAccept = &ac
 	}
-
-	return nil
+	return result, nil
 }
 
-// newRequest creates a new HTTP request with common headers.
-func (c *Client) newRequest(ctx context.Context, method, endpoint string, body io.Reader) (*http.Request, error) {
-	u, err := url.Parse(c.baseURL)
+func (s *Client) PDPInfo(pieceLink piece.PieceLink) (pdp.InfoOk, error) {
+	inv, err := pdp.Info.Invoke(
+		s.cfg.ID,
+		s.cfg.StorageNodeID,
+		s.cfg.StorageNodeID.DID().String(),
+		pdp.InfoCaveats{
+			Piece: pieceLink,
+		},
+		delegation.WithProof(s.cfg.StorageProof),
+	)
+
 	if err != nil {
-		return nil, fmt.Errorf("parsing base URL: %w", err)
+		return pdp.InfoOk{}, fmt.Errorf("generating invocation: %w", err)
 	}
-	u.Path = path.Join(u.Path, endpoint)
 
-	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
+	res, err := client.Execute([]invocation.Invocation{inv}, s.conn)
 	if err != nil {
-		return nil, fmt.Errorf("creating HTTP request: %w", err)
+		return pdp.InfoOk{}, fmt.Errorf("sending invocation: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", c.userAgent)
-
-	return req, nil
-}
-
-// handleErrorResponse processes error responses from the API.
-func (c *Client) handleErrorResponse(resp *http.Response) error {
-	body, _ := io.ReadAll(resp.Body)
-
-	// Try to decode as error response
-	var errResp models.ErrorResponse
-	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error != "" {
-		return &APIError{
-			StatusCode: resp.StatusCode,
-			Message:    errResp.Message,
-			ErrorCode:  errResp.Error,
-		}
+	reader, err := receipt.NewReceiptReaderFromTypes[pdp.InfoOk, fdm.FailureModel](pdp.InfoOkType(), fdm.FailureType(), types.Converters...)
+	if err != nil {
+		return pdp.InfoOk{}, fmt.Errorf("generating receipt reader: %w", err)
 	}
 
-	// Try to decode as API response with error
-	var apiResp models.APIResponse
-	if err := json.Unmarshal(body, &apiResp); err == nil && !apiResp.Success {
-		return &APIError{
-			StatusCode: resp.StatusCode,
-			Message:    apiResp.Message,
-			ErrorCode:  apiResp.Error,
-		}
+	rcptLink, ok := res.Get(inv.Link())
+	if !ok {
+		return pdp.InfoOk{}, ErrNoReceipt
 	}
 
-	// Fallback to raw response
-	return &APIError{
-		StatusCode: resp.StatusCode,
-		Message:    string(body),
-		ErrorCode:  fmt.Sprintf("HTTP_%d", resp.StatusCode),
+	rcpt, err := reader.Read(rcptLink, res.Blocks())
+	if err != nil {
+		return pdp.InfoOk{}, fmt.Errorf("reading receipt: %w", err)
 	}
+	return result.Unwrap(result.MapError(rcpt.Out(), failure.FromFailureModel))
 }
 
-// APIError represents an error response from the delegator API.
-type APIError struct {
-	StatusCode int    `json:"status_code"`
-	Message    string `json:"message"`
-	ErrorCode  string `json:"error_code"`
-}
-
-func (e *APIError) Error() string {
-	if e.Message != "" {
-		return fmt.Sprintf("delegator API error (%d): %s", e.StatusCode, e.Message)
+func NewClient(cfg Config) (*Client, error) {
+	ch := uhttp.NewHTTPChannel(&cfg.StorageNodeURL)
+	conn, err := client.NewConnection(cfg.StorageNodeID, ch)
+	if err != nil {
+		return nil, fmt.Errorf("setting up connection: %w", err)
 	}
-	return fmt.Sprintf("delegator API error (%d): %s", e.StatusCode, e.ErrorCode)
-}
-
-// IsNotFound returns true if the error is a 404 Not Found.
-func (e *APIError) IsNotFound() bool {
-	return e.StatusCode == http.StatusNotFound
-}
-
-// IsBadRequest returns true if the error is a 400 Bad Request.
-func (e *APIError) IsBadRequest() bool {
-	return e.StatusCode == http.StatusBadRequest
-}
-
-// IsForbidden returns true if the error is a 403 Forbidden.
-func (e *APIError) IsForbidden() bool {
-	return e.StatusCode == http.StatusForbidden
-}
-
-// IsConflict returns true if the error is a 409 Conflict.
-func (e *APIError) IsConflict() bool {
-	return e.StatusCode == http.StatusConflict
+	return &Client{cfg, conn}, nil
 }

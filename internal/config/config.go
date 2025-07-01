@@ -54,6 +54,9 @@ type OnboardingConfig struct {
 	// PiriNodeEnvVars is a map of environment variables to display to operators after successful onboarding
 	// These will be shown in step 5 for operators to configure their piri node
 	PiriNodeEnvVars map[string]string `mapstructure:"piri_node_env_vars"`
+
+	// TestDataUploadSizeMB is the size of the data in megabytes to test uploading with.
+	TestDataUploadSizeMB uint `mapstructure:"test_data_upload_size_mb"`
 }
 
 // LogConfig holds logging configuration
@@ -145,6 +148,7 @@ var Default = Config{
 		IndexingServiceWebDID:   "",                  // required config
 		KeyFilePath:             "",                  // required config
 		PiriNodeEnvVars:         map[string]string{}, // optional, additional env vars to display
+		TestDataUploadSizeMB:    100,
 	},
 	Log: LogConfig{
 		Level: "info",

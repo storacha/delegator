@@ -88,6 +88,8 @@ type Service struct {
 	indexingServiceProof  delegation.Proof
 	uploadServiceDID      did.DID
 	indexingServiceWebDID did.DID
+
+	testDataUploadSizeMB uint
 }
 
 type Option func(*Service)
@@ -146,6 +148,7 @@ func New(cfg config.OnboardingConfig, opts ...Option) (*Service, error) {
 		indexingServiceProof:  indexerProof,
 		uploadServiceDID:      uploadServiceDID,
 		indexingServiceWebDID: indexingServiceWebDID,
+		testDataUploadSizeMB:  cfg.TestDataUploadSizeMB,
 	}
 
 	for _, opt := range opts {
@@ -762,7 +765,10 @@ func (s *Service) TestStorage(sessionID string, delegationProof string) (string,
 	}
 
 	// Single variable for upload size
-	const testDataSizeMB = 10
+	var testDataSizeMB = uint(10)
+	if s.testDataUploadSizeMB != 0 {
+		testDataSizeMB = s.testDataUploadSizeMB
+	}
 
 	// Helper function to update progress
 	updateProgress := func(step, message, details string, percentage int) {
@@ -842,7 +848,7 @@ func (s *Service) TestStorage(sessionID string, delegationProof string) (string,
 
 	// Generate test data
 	updateProgress("generating", "Generating test data", fmt.Sprintf("Creating %dMB test file", testDataSizeMB), 25)
-	blobData := generatePiriString(testDataSizeMB)
+	blobData := generatePiriString(int(testDataSizeMB))
 	digest, err := sha256.Hasher.Sum(blobData)
 	if err != nil {
 		updateProgress("error", "Failed to compute data hash", err.Error(), 30)
@@ -988,7 +994,7 @@ func (s *Service) TestStorage(sessionID string, delegationProof string) (string,
 			UploadDuration float64 `json:"upload_duration_seconds"`
 		}{
 			DownloadURL:    downloadURL,
-			UploadSizeMB:   testDataSizeMB,
+			UploadSizeMB:   int(testDataSizeMB),
 			AvgSpeedGbps:   avgSpeedGbps,
 			UploadDuration: uploadDuration,
 		}

@@ -2,126 +2,67 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/gorilla/sessions"
-	logging "github.com/ipfs/go-log"
-	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"go.uber.org/fx"
 
-	"github.com/storacha/delegator/internal/api"
-	"github.com/storacha/delegator/internal/config"
-	"github.com/storacha/delegator/internal/storage"
+	"github.com/storacha/piri/delegator/internal/config"
+	"github.com/storacha/piri/delegator/internal/handlers"
 )
 
-var log = logging.Logger("server")
-
-// Server represents the HTTP server instance
 type Server struct {
-	echo           *echo.Echo
-	config         *config.Config
-	sessionStore   storage.SessionStore
-	persistedStore storage.PersistentStore
+	echo     *echo.Echo
+	config   *config.Config
+	handlers *handlers.Handlers
 }
 
-// New creates a new server instance with the provided configuration
-func New(cfg *config.Config) (*Server, error) {
-	if cfg == nil {
-		return nil, fmt.Errorf("config cannot be nil")
-	}
-
-	dynamoStore, err := storage.NewDynamoDBStore(cfg.Dynamo)
-	if err != nil {
-		return nil, err
-	}
-	for _, l := range cfg.Onboarding.AllowList {
-		if err := dynamoStore.AddAllowedDID(l); err != nil {
-			return nil, err
-		}
-	}
-
-	// Create Echo instance
+func NewServer(cfg *config.Config, h *handlers.Handlers) *Server {
 	e := echo.New()
 	e.HideBanner = true
 
-	// Configure middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
 	e.Use(middleware.RequestID())
 
-	// Configure session middleware with proper settings
-	cookieStore := sessions.NewCookieStore([]byte(cfg.Server.SessionKey))
-	cookieStore.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   86400 * 7, // 1 week
-		HttpOnly: true,
-		Secure:   false, // Set to true in production with HTTPS
-		SameSite: http.SameSiteLaxMode,
+	return &Server{
+		echo:     e,
+		config:   cfg,
+		handlers: h,
 	}
-	e.Use(session.Middleware(cookieStore))
-
-	// Log debug message about session configuration
-	log.Debugw("Session middleware configured", "key_length", len(cfg.Server.SessionKey))
-
-	e.Server.ReadTimeout = cfg.Server.ReadTimeout
-	e.Server.ReadHeaderTimeout = cfg.Server.ReadTimeout
-	e.Server.IdleTimeout = cfg.Server.ReadTimeout
-	e.Server.WriteTimeout = cfg.Server.WriteTimeout
-
-	// Initialize API routes
-	sessionStore := storage.NewMemoryStore()
-	if err := api.RegisterRoutes(e, cfg, sessionStore, dynamoStore); err != nil {
-		return nil, fmt.Errorf("failed to register routes: %w", err)
-	}
-
-	svr := &Server{
-		echo:           e,
-		config:         cfg,
-		sessionStore:   sessionStore,
-		persistedStore: dynamoStore,
-	}
-
-	return svr, nil
 }
 
-// Start starts the HTTP server
-func (s *Server) Start() error {
-	addr := fmt.Sprintf("%s:%d", s.config.Server.Host, s.config.Server.Port)
-	log.Infow("Starting HTTP server", "address", addr)
-
-	if err := s.echo.Start(addr); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("server start failed: %w", err)
-	}
-
-	return nil
+func (s *Server) setupRoutes() {
+	s.echo.GET("/health", s.handlers.HealthCheck)
+	s.echo.GET("/", s.handlers.Root)
+	s.echo.PUT("/registrar/register-node", s.handlers.Register)
+	s.echo.GET("/registrar/request-proof", s.handlers.RequestProof)
+	s.echo.GET("/registrar/is-registered", s.handlers.IsRegistered)
+	s.echo.POST("/benchmark/upload", s.handlers.BenchmarkUpload)
+	s.echo.POST("/benchmark/download", s.handlers.BenchmarkDownload)
 }
 
-// Shutdown gracefully shuts down the server
-func (s *Server) Shutdown(ctx context.Context) error {
-	log.Infow("Shutting down server")
+func Start(lc fx.Lifecycle, s *Server) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			s.setupRoutes()
 
-	if err := s.echo.Shutdown(ctx); err != nil {
-		return fmt.Errorf("server shutdown failed: %w", err)
-	}
+			go func() {
+				addr := s.config.Server.Address()
+				fmt.Printf("Starting server on %s\n", addr)
+				if err := s.echo.Start(addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					fmt.Printf("Server error: %v\n", err)
+				}
+			}()
 
-	log.Infow("Server exited")
-	return nil
-}
-
-// Echo returns the underlying Echo instance for advanced configuration
-func (s *Server) Echo() *echo.Echo {
-	return s.echo
-}
-
-// SessionStore returns the session store
-func (s *Server) SessionStore() storage.SessionStore {
-	return s.sessionStore
-}
-
-// PersistentStore returns the persistent store
-func (s *Server) PersistentStore() storage.PersistentStore {
-	return s.persistedStore
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			fmt.Println("Shutting down server...")
+			return s.echo.Shutdown(ctx)
+		},
+	})
 }

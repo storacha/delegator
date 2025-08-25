@@ -1,4 +1,4 @@
-package storage
+package store
 
 import (
 	"context"
@@ -10,23 +10,25 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/storacha/go-ucanto/did"
 
-	"github.com/storacha/delegator/internal/config"
-	"github.com/storacha/delegator/internal/models"
+	"github.com/storacha/piri/delegator/internal/config"
 )
 
-// DynamoDBStore provides storage via AWS DynamoDB
-type DynamoDBStore struct {
+var log = logging.Logger("store/dynamo")
+
+// DynamoDB provides storage via AWS DynamoDB
+type DynamoDB struct {
 	db                    *dynamodb.Client
 	initialized           bool
-	ctx                   context.Context
 	allowListTableName    string
 	providerInfoTableName string
 	providerWeight        uint
 }
 
 // NewDynamoDBStore creates a new DynamoDB-backed store
-func NewDynamoDBStore(config config.DynamoConfig) (*DynamoDBStore, error) {
+func NewDynamoDBStore(config config.DynamoConfig) (*DynamoDB, error) {
 	ctx := context.Background()
 
 	// Create custom config resolver if endpoint is specified
@@ -62,20 +64,19 @@ func NewDynamoDBStore(config config.DynamoConfig) (*DynamoDBStore, error) {
 	client := dynamodb.NewFromConfig(cfg)
 
 	// Create store
-	store := &DynamoDBStore{
+	store := &DynamoDB{
 		db:                    client,
 		initialized:           false,
-		ctx:                   ctx,
 		allowListTableName:    config.AllowListTableName,
 		providerInfoTableName: config.ProviderInfoTableName,
 		providerWeight:        config.ProviderWeight,
 	}
 
-	return store, store.initialize(config)
+	return store, store.initialize(ctx, config)
 }
 
 // Initialize creates tables if they don't exist
-func (d *DynamoDBStore) initialize(cfg config.DynamoConfig) error {
+func (d *DynamoDB) initialize(ctx context.Context, cfg config.DynamoConfig) error {
 	if d.initialized {
 		return nil
 	}
@@ -130,7 +131,7 @@ func (d *DynamoDBStore) initialize(cfg config.DynamoConfig) error {
 
 	for _, table := range tables {
 		// Check if table exists first
-		_, err := d.db.DescribeTable(d.ctx, &dynamodb.DescribeTableInput{
+		_, err := d.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 			TableName: aws.String(table.name),
 		})
 
@@ -147,7 +148,7 @@ func (d *DynamoDBStore) initialize(cfg config.DynamoConfig) error {
 			BillingMode:          types.BillingModePayPerRequest, // Simpler than provisioned
 		}
 
-		_, err = d.db.CreateTable(d.ctx, input)
+		_, err = d.db.CreateTable(ctx, input)
 		if err != nil {
 			return fmt.Errorf("failed to create table %s: %w", table.name, err)
 		}
@@ -157,33 +158,40 @@ func (d *DynamoDBStore) initialize(cfg config.DynamoConfig) error {
 	log.Infow("DynamoDB store initialized",
 		"region", d.db.Options().Region,
 		"endpoint", d.db.Options().EndpointResolver)
+	allowed, err := did.Parse("did:key:z6MktKFLaLfEEisRzdLjRQXwzAMrfdvgYF8rBsgotdhTXTri")
+	if err != nil {
+		panic(err)
+	}
+	if err := d.AddAllowedDID(ctx, allowed); err != nil {
+		panic(err)
+	}
 	return nil
 }
 
 // IsAllowedDID checks if a DID is allowed for onboarding (implements PersistentStore interface)
-func (d *DynamoDBStore) IsAllowedDID(did string) (bool, error) {
+func (d *DynamoDB) IsAllowedDID(ctx context.Context, id did.DID) (bool, error) {
 	input := &dynamodb.GetItemInput{
 		TableName: aws.String(d.allowListTableName),
 		Key: map[string]types.AttributeValue{
-			"did": &types.AttributeValueMemberS{Value: did},
+			"did": &types.AttributeValueMemberS{Value: id.String()},
 		},
 		ProjectionExpression: aws.String("did"), // Only retrieve the key
 	}
 
-	result, err := d.db.GetItem(d.ctx, input)
+	result, err := d.db.GetItem(ctx, input)
 	if err != nil {
-		return false, fmt.Errorf("failed to check DID allowlist: %w", err)
+		return false, fmt.Errorf("failed to check DID %s allowlist: %w", id.String(), err)
 	}
 
 	return len(result.Item) > 0, nil
 }
 
 // AddAllowedDID adds a DID to the allowlist (implements PersistentStore interface)
-func (d *DynamoDBStore) AddAllowedDID(did string) error {
+func (d *DynamoDB) AddAllowedDID(ctx context.Context, id did.DID) error {
 	// Use a simple approach - just add the required key directly
 	// This avoids any serialization issues with the struct
 	item := map[string]types.AttributeValue{
-		"did":     &types.AttributeValueMemberS{Value: did},
+		"did":     &types.AttributeValueMemberS{Value: id.String()},
 		"addedBy": &types.AttributeValueMemberS{Value: "system"},
 		"addedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
 		"notes":   &types.AttributeValueMemberS{Value: "Added via API"},
@@ -194,9 +202,9 @@ func (d *DynamoDBStore) AddAllowedDID(did string) error {
 		Item:      item,
 	}
 
-	_, err := d.db.PutItem(d.ctx, input)
+	_, err := d.db.PutItem(ctx, input)
 	if err != nil {
-		log.Errorw("Error adding DID to allowlist", "did", did, "error", err)
+		log.Errorw("Error adding DID to allowlist", "did", id.String(), "error", err)
 		return fmt.Errorf("failed to add DID to allowlist: %w", err)
 	}
 
@@ -204,16 +212,16 @@ func (d *DynamoDBStore) AddAllowedDID(did string) error {
 }
 
 // IsRegisteredDID checks if a DID is registered as a provider (implements PersistentStore interface)
-func (d *DynamoDBStore) IsRegisteredDID(did string) (bool, error) {
+func (d *DynamoDB) IsRegisteredDID(ctx context.Context, id did.DID) (bool, error) {
 	input := &dynamodb.GetItemInput{
 		TableName: aws.String(d.providerInfoTableName),
 		Key: map[string]types.AttributeValue{
-			"provider": &types.AttributeValueMemberS{Value: did},
+			"provider": &types.AttributeValueMemberS{Value: id.String()},
 		},
 		ProjectionExpression: aws.String("provider"), // Only retrieve the key
 	}
 
-	result, err := d.db.GetItem(d.ctx, input)
+	result, err := d.db.GetItem(ctx, input)
 	if err != nil {
 		return false, fmt.Errorf("failed to check provider registration: %w", err)
 	}
@@ -222,7 +230,7 @@ func (d *DynamoDBStore) IsRegisteredDID(did string) (bool, error) {
 }
 
 // RegisterProvider registers a new provider (implements PersistentStore interface)
-func (d *DynamoDBStore) RegisterProvider(info *models.StorageProviderInfo) error {
+func (d *DynamoDB) RegisterProvider(ctx context.Context, info StorageProviderInfo) error {
 	// Set timestamps if they're not already set
 	now := time.Now()
 	info.InsertedAt = now
@@ -268,7 +276,7 @@ func (d *DynamoDBStore) RegisterProvider(info *models.StorageProviderInfo) error
 		Item:      item,
 	}
 
-	_, err := d.db.PutItem(d.ctx, input)
+	_, err := d.db.PutItem(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to register provider: %w", err)
 	}

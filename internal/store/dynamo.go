@@ -138,19 +138,22 @@ func (d *DynamoDB) initialize(ctx context.Context, cfg config.DynamoConfig) erro
 		if err == nil {
 			log.Infow("Table already exists", "table_name", table.name)
 			continue
-		}
+			// if the endpoint wasn't set it means we are in production mode, and we want to fail if the tables don't already exist
+		} else if cfg.Endpoint == "" {
+			return fmt.Errorf("failed to check if table %s exists: %w", table.name, err)
+		} else {
+			// else we are in developer mode (endpoint set) so we want to create the tables
+			input := &dynamodb.CreateTableInput{
+				TableName:            aws.String(table.name),
+				KeySchema:            table.keySchema,
+				AttributeDefinitions: table.attributes,
+				BillingMode:          types.BillingModePayPerRequest, // Simpler than provisioned
+			}
 
-		// Create table
-		input := &dynamodb.CreateTableInput{
-			TableName:            aws.String(table.name),
-			KeySchema:            table.keySchema,
-			AttributeDefinitions: table.attributes,
-			BillingMode:          types.BillingModePayPerRequest, // Simpler than provisioned
-		}
-
-		_, err = d.db.CreateTable(ctx, input)
-		if err != nil {
-			return fmt.Errorf("failed to create table %s: %w", table.name, err)
+			_, err = d.db.CreateTable(ctx, input)
+			if err != nil {
+				return fmt.Errorf("failed to create table %s: %w", table.name, err)
+			}
 		}
 	}
 
@@ -158,13 +161,6 @@ func (d *DynamoDB) initialize(ctx context.Context, cfg config.DynamoConfig) erro
 	log.Infow("DynamoDB store initialized",
 		"region", d.db.Options().Region,
 		"endpoint", d.db.Options().EndpointResolver)
-	allowed, err := did.Parse("did:key:z6MktKFLaLfEEisRzdLjRQXwzAMrfdvgYF8rBsgotdhTXTri")
-	if err != nil {
-		panic(err)
-	}
-	if err := d.AddAllowedDID(ctx, allowed); err != nil {
-		panic(err)
-	}
 	return nil
 }
 

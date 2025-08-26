@@ -171,7 +171,7 @@ Perform a download benchmark test from a storage endpoint.
 A Go client library is provided in the `client/` package for interacting with the delegator service:
 
 ```go
-import "github.com/storacha/piri/delegator/client"
+import "github.com/storacha/delegator/client"
 
 // Create client
 c, err := client.New("http://localhost:8080")

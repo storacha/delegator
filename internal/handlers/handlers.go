@@ -9,8 +9,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
-	"github.com/storacha/piri/delegator/internal/services/benchmark"
-	"github.com/storacha/piri/delegator/internal/services/registrar"
+	"github.com/storacha/delegator/internal/services/benchmark"
+	"github.com/storacha/delegator/internal/services/registrar"
 )
 
 type Handlers struct {

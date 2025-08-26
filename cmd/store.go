@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/storacha/go-ucanto/did"
-	"github.com/storacha/piri/delegator/internal/config"
-	"github.com/storacha/piri/delegator/internal/store"
+	"github.com/storacha/delegator/internal/config"
+	"github.com/storacha/delegator/internal/store"
 )
 
 var StoreCmd = &cobra.Command{

@@ -3,15 +3,15 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/storacha/piri/delegator/internal/services/benchmark"
-	"github.com/storacha/piri/delegator/internal/services/registrar"
+	"github.com/storacha/delegator/internal/services/benchmark"
+	"github.com/storacha/delegator/internal/services/registrar"
 	"go.uber.org/fx"
 
-	"github.com/storacha/piri/delegator/internal/config"
-	"github.com/storacha/piri/delegator/internal/handlers"
-	"github.com/storacha/piri/delegator/internal/providers"
-	"github.com/storacha/piri/delegator/internal/server"
-	"github.com/storacha/piri/delegator/internal/store"
+	"github.com/storacha/delegator/internal/config"
+	"github.com/storacha/delegator/internal/handlers"
+	"github.com/storacha/delegator/internal/providers"
+	"github.com/storacha/delegator/internal/server"
+	"github.com/storacha/delegator/internal/store"
 )
 
 var ServeCmd = &cobra.Command{

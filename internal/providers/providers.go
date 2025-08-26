@@ -14,7 +14,7 @@ import (
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"go.uber.org/fx"
 
-	"github.com/storacha/piri/delegator/internal/config"
+	"github.com/storacha/delegator/internal/config"
 )
 
 type SignerParams struct {

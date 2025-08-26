@@ -23,7 +23,7 @@ import (
 	"github.com/storacha/go-ucanto/ucan"
 	"go.uber.org/fx"
 
-	"github.com/storacha/piri/delegator/internal/store"
+	"github.com/storacha/delegator/internal/store"
 )
 
 var log = logging.Logger("service/delegator")

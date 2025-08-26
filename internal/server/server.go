@@ -10,8 +10,8 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/fx"
 
-	"github.com/storacha/piri/delegator/internal/config"
-	"github.com/storacha/piri/delegator/internal/handlers"
+	"github.com/storacha/delegator/internal/config"
+	"github.com/storacha/delegator/internal/handlers"
 )
 
 type Server struct {

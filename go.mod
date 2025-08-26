@@ -1,4 +1,4 @@
-module github.com/storacha/piri/delegator
+module github.com/storacha/delegator
 
 go 1.24.4
 

@@ -21,7 +21,7 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
-	"github.com/storacha/piri/delegator/internal/services/benchmark/client"
+	"github.com/storacha/delegator/internal/services/benchmark/client"
 	"go.uber.org/fx"
 )
 

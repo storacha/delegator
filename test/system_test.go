@@ -27,13 +27,13 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 
-	"github.com/storacha/piri/delegator/client"
-	"github.com/storacha/piri/delegator/internal/config"
-	"github.com/storacha/piri/delegator/internal/handlers"
-	"github.com/storacha/piri/delegator/internal/server"
-	"github.com/storacha/piri/delegator/internal/services/benchmark"
-	"github.com/storacha/piri/delegator/internal/services/registrar"
-	"github.com/storacha/piri/delegator/internal/store"
+	"github.com/storacha/delegator/client"
+	"github.com/storacha/delegator/internal/config"
+	"github.com/storacha/delegator/internal/handlers"
+	"github.com/storacha/delegator/internal/server"
+	"github.com/storacha/delegator/internal/services/benchmark"
+	"github.com/storacha/delegator/internal/services/registrar"
+	"github.com/storacha/delegator/internal/store"
 )
 
 // mockStore implements the store.Store interface for testing

@@ -13,7 +13,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/storacha/go-ucanto/did"
 
-	"github.com/storacha/piri/delegator/internal/config"
+	"github.com/storacha/delegator/internal/config"
 )
 
 var log = logging.Logger("store/dynamo")

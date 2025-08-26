@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 
@@ -70,7 +71,18 @@ func (h *Handlers) Register(c echo.Context) error {
 		PublicURL:     *endpoint,
 		Proof:         req.Proof,
 	}); err != nil {
-		// TODO map the errors the service returns to http codes
+		if errors.Is(err, registrar.ErrDIDNotAllowed) {
+			return c.String(http.StatusForbidden, "DID not allowed to register, contact Storacha team for help registering")
+		}
+		if errors.Is(err, registrar.ErrDIDAlreadyRegistered) {
+			return c.String(http.StatusConflict, "DID already registered")
+		}
+		if errors.Is(err, registrar.ErrBadEndpoint) {
+			return c.String(http.StatusBadRequest, "invalid PublicURL")
+		}
+		if errors.Is(err, registrar.ErrInvalidProof) {
+			return c.String(http.StatusBadRequest, "invalid Proof")
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": err.Error(),
 		})

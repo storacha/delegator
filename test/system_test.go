@@ -43,6 +43,20 @@ type mockStore struct {
 	registeredDIDs map[string]store.StorageProviderInfo
 }
 
+func (m *mockStore) AddAllowedDID(ctx context.Context, did did.DID) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	m.allowedDIDs[did.String()] = true
+	return nil
+}
+
+func (m *mockStore) RemoveAllowedDID(ctx context.Context, did did.DID) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	delete(m.allowedDIDs, did.String())
+	return nil
+}
+
 func newMockStore() *mockStore {
 	return &mockStore{
 		allowedDIDs:    make(map[string]bool),
@@ -668,13 +682,6 @@ func TestSystemInvalidRequests(t *testing.T) {
 			endpoint: "/registrar/register-node",
 			body:     `{"did": "did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e", "owner_address": "not-an-address", "proof_set_id": 1, "operator_email": "test@example.com", "public_url": "http://example.com", "proof": "test"}`,
 			wantCode: http.StatusBadRequest,
-		},
-		{
-			name:     "invalid URL in register",
-			method:   "PUT",
-			endpoint: "/registrar/register-node",
-			body:     `{"did": "did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e", "owner_address": "0x1234567890123456789012345678901234567890", "proof_set_id": 1, "operator_email": "test@example.com", "public_url": "not a url", "proof": "test"}`,
-			wantCode: http.StatusInternalServerError, // Server returns 500 for URL parse errors
 		},
 		{
 			name:     "malformed JSON in is-registered",

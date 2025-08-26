@@ -1,3 +1,6 @@
+# keys
+*.pem
+*.hex
 # Binaries
 delegator
 *.exe

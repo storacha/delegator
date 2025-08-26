@@ -182,7 +182,7 @@ func (d *DynamoDB) IsAllowedDID(ctx context.Context, id did.DID) (bool, error) {
 	return len(result.Item) > 0, nil
 }
 
-// AddAllowedDID adds a DID to the allowlist (implements PersistentStore interface)
+// AddAllowedDID adds a DID to the allowlist (implements Store interface)
 func (d *DynamoDB) AddAllowedDID(ctx context.Context, id did.DID) error {
 	// Use a simple approach - just add the required key directly
 	// This avoids any serialization issues with the struct
@@ -202,6 +202,24 @@ func (d *DynamoDB) AddAllowedDID(ctx context.Context, id did.DID) error {
 	if err != nil {
 		log.Errorw("Error adding DID to allowlist", "did", id.String(), "error", err)
 		return fmt.Errorf("failed to add DID to allowlist: %w", err)
+	}
+
+	return nil
+}
+
+// RemoveAllowedDID removes a DID from the allowlist (implements Store interface)
+func (d *DynamoDB) RemoveAllowedDID(ctx context.Context, id did.DID) error {
+	input := &dynamodb.DeleteItemInput{
+		TableName: aws.String(d.allowListTableName),
+		Key: map[string]types.AttributeValue{
+			"did": &types.AttributeValueMemberS{Value: id.String()},
+		},
+	}
+
+	_, err := d.db.DeleteItem(ctx, input)
+	if err != nil {
+		log.Errorw("Error removing DID from allowlist", "did", id.String(), "error", err)
+		return fmt.Errorf("failed to remove DID from allowlist: %w", err)
 	}
 
 	return nil

@@ -6,17 +6,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-type Config struct {
-	Server    ServerConfig
-	Store     DynamoConfig
-	Delegator DelegatorServiceConfig
-}
-
-type ServerConfig struct {
-	Host string
-	Port int
-}
-
 func NewConfig() (*Config, error) {
 	cfg := &Config{
 		Server: ServerConfig{
@@ -71,33 +60,44 @@ func NewConfig() (*Config, error) {
 	return cfg, nil
 }
 
+type Config struct {
+	Server    ServerConfig           `mapstructure:"server"`
+	Store     DynamoConfig           `mapstructure:"store"`
+	Delegator DelegatorServiceConfig `mapstructure:"delegator"`
+}
+
+type ServerConfig struct {
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
+}
+
 func (c *ServerConfig) Address() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
 }
 
 type DynamoConfig struct {
 	// Region of the dynamoDB instance
-	Region string
+	Region string `mapstructure:"region"`
 	// Name of table we use for allowing users to register
-	AllowListTableName string
+	AllowListTableName string `mapstructure:"allowlist_table_name"`
 	// Name of table we persist registered user data to
-	ProviderInfoTableName string
+	ProviderInfoTableName string `mapstructure:"providerinfo_table_name"`
 
 	// ProviderWeight is the weight that will be assigned to a provider
 	// when they are registered. This value will affect their odds of being
 	// selected for an upload. `0` means they will not be selected.
-	ProviderWeight uint
+	ProviderWeight uint `mapstructure:"providerweight"`
 
 	// Endpoint may be set for local testing, usually with docker, e.g.
 	// docker run -p 8000:8000 amazon/dynamodb-local -jar DynamoDBLocal.jar -sharedDb
 	// then set endpoint to localhost:8080
 	// Do not set for production.
-	Endpoint string // for development
+	Endpoint string `mapstructure:"endpoint"` // for development
 }
 
 type DelegatorServiceConfig struct {
-	KeyFile               string
-	IndexingServiceWebDID string
-	IndexingServiceProof  string
-	UploadServiceDID      string
+	KeyFile               string `mapstructure:"key_file"`
+	IndexingServiceWebDID string `mapstructure:"indexing_service_web_did"`
+	IndexingServiceProof  string `mapstructure:"indexing_service_proof"`
+	UploadServiceDID      string `mapstructure:"upload_service_did"`
 }

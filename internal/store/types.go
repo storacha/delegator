@@ -29,6 +29,8 @@ type StorageProviderInfo struct {
 
 type Store interface {
 	IsAllowedDID(ctx context.Context, did did.DID) (bool, error)
+	AddAllowedDID(ctx context.Context, did did.DID) error
+	RemoveAllowedDID(ctx context.Context, did did.DID) error
 	IsRegisteredDID(ctx context.Context, did did.DID) (bool, error)
 	RegisterProvider(ctx context.Context, provider StorageProviderInfo) error
 }

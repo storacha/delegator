@@ -187,10 +187,10 @@ func (d *DynamoDB) AddAllowedDID(ctx context.Context, id did.DID) error {
 	// Use a simple approach - just add the required key directly
 	// This avoids any serialization issues with the struct
 	item := map[string]types.AttributeValue{
-		"did":     &types.AttributeValueMemberS{Value: id.String()},
-		"addedBy": &types.AttributeValueMemberS{Value: "system"},
-		"addedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
-		"notes":   &types.AttributeValueMemberS{Value: "Added via API"},
+		"did":      &types.AttributeValueMemberS{Value: id.String()},
+		"added_by": &types.AttributeValueMemberS{Value: "system"},
+		"added_at": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+		"notes":    &types.AttributeValueMemberS{Value: "added by delegator store cli command"},
 	}
 
 	input := &dynamodb.PutItemInput{

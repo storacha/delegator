@@ -7,10 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/labstack/echo/v4"
-	"github.com/storacha/go-ucanto/core/delegation"
-	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/delegator/internal/services/benchmark"
 	"github.com/storacha/delegator/internal/services/registrar"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/did"
 )
 
 type Handlers struct {
@@ -167,8 +167,8 @@ type BenchmarkUploadResponse struct {
 	AllocateDuration string `json:"allocate_duration"`
 	UploadDuration   string `json:"upload_duration"`
 	AcceptDuration   string `json:"accept_duration"`
-	DownloadURL      string `json:"download_url,omitempty"`
-	PieceLink        string `json:"piece_link,omitempty"`
+	DownloadURL      string `json:"download_url"`
+	PieceLink        string `json:"piece_link"`
 }
 
 func (h *Handlers) BenchmarkUpload(c echo.Context) error {

@@ -17,6 +17,7 @@ import (
 	"github.com/storacha/go-libstoracha/capabilities/blob/replica"
 	"github.com/storacha/go-libstoracha/capabilities/claim"
 	"github.com/storacha/go-libstoracha/capabilities/pdp"
+	"github.com/storacha/go-libstoracha/capabilities/space/egress"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
@@ -45,6 +46,9 @@ type Service struct {
 	indexingServiceWebDID did.DID
 	indexingServiceProof  delegation.Delegation
 
+	egressTrackingServiceDID   did.DID
+	egressTrackingServiceProof delegation.Delegation
+
 	uploadServiceDID did.DID
 }
 
@@ -62,17 +66,24 @@ type ServiceParams struct {
 	// proof from the indexer, delegated to this delegator, allowing it to create delegations on behalf of indexing service
 	IndexingServiceProof delegation.Delegation `name:"indexing_service_proof"`
 
+	// the did of the egress tracking service
+	EgressTrackingServiceDID did.DID `name:"egress_tracking_service_did"`
+	// proof from the egress tracking service, delegated to this delegator
+	EgressTrackingServiceProof delegation.Delegation `name:"egress_tracking_service_proof"`
+
 	// the did of the upload service, used for validating operator proofs are correct
 	UploadServiceDID did.DID `name:"upload_service_did"`
 }
 
 func New(p ServiceParams) *Service {
 	return &Service{
-		store:                 p.Store,
-		signer:                p.Signer,
-		indexingServiceWebDID: p.IndexingServiceWebDID,
-		indexingServiceProof:  p.IndexingServiceProof,
-		uploadServiceDID:      p.UploadServiceDID,
+		store:                      p.Store,
+		signer:                     p.Signer,
+		indexingServiceWebDID:      p.IndexingServiceWebDID,
+		indexingServiceProof:       p.IndexingServiceProof,
+		egressTrackingServiceDID:   p.EgressTrackingServiceDID,
+		egressTrackingServiceProof: p.EgressTrackingServiceProof,
+		uploadServiceDID:           p.UploadServiceDID,
 	}
 }
 
@@ -104,7 +115,7 @@ func (s *Service) Register(ctx context.Context, req RegisterParams) error {
 		return ErrDIDAlreadyRegistered
 	}
 
-	// ensure the did they claim to own is served from the endpoint they calim to own
+	// ensure the did they claim to own is served from the endpoint they claim to own
 	if valid, err := assertEndpointServesDID(ctx, req.PublicURL, req.DID); err != nil {
 		log.Errorw("failed to assert endpoint", "DID", req.DID, "error", err)
 		return err
@@ -112,7 +123,7 @@ func (s *Service) Register(ctx context.Context, req RegisterParams) error {
 		return ErrBadEndpoint
 	}
 
-	// ensure the proof they provided, allowing the upload service to write to their node is valid
+	// ensure the proof they provided, allowing the upload service to write to their node, is valid
 	if err := s.assertProofValid(req.Proof, req.DID); err != nil {
 		log.Errorw("failed to validate proof", "error", err)
 		return ErrInvalidProof
@@ -147,37 +158,42 @@ func (s *Service) IsRegisteredDID(ctx context.Context, operator did.DID) (bool, 
 	return registered, nil
 }
 
-func (s *Service) RequestProof(ctx context.Context, operator did.DID) (delegation.Delegation, error) {
+func (s *Service) RequestProofs(ctx context.Context, operator did.DID) (delegation.Delegation, delegation.Delegation, error) {
 	// ensure they are allowed to register
 	allowed, err := s.store.IsAllowedDID(ctx, operator)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check if DID is allowed: %w", err)
+		return nil, nil, fmt.Errorf("failed to check if DID is allowed: %w", err)
 	}
 	if !allowed {
-		return nil, ErrDIDNotAllowed
+		return nil, nil, ErrDIDNotAllowed
 	}
 
 	// ensure they haven't already registered
 	registered, err := s.store.IsRegisteredDID(ctx, operator)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check if DID is registered: %w", err)
+		return nil, nil, fmt.Errorf("failed to check if DID is registered: %w", err)
 	}
 	// must be registered to request a proof
 	if !registered {
-		return nil, ErrDIDNotRegistered
+		return nil, nil, ErrDIDNotRegistered
 	}
 
 	// the node is in allow list, and already registered, they may haz proof
-	proof, err := s.generateDelegation(operator)
+	indexerProof, err := s.generateIndexerDelegation(operator)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate delegation: %w", err)
+		return nil, nil, fmt.Errorf("failed to generate indexer delegation: %w", err)
 	}
 
-	return proof, nil
+	egressTrackerProof, err := s.generateEgressTrackerDelegation(operator)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate egress tracker delegation: %w", err)
+	}
+
+	return indexerProof, egressTrackerProof, nil
 }
 
-// generateDelegation generates a delegation for the provider (stubbed)
-func (s *Service) generateDelegation(id did.DID) (delegation.Delegation, error) {
+// generateIndexerDelegation generates a delegation for the storage node to interact with the indexing service
+func (s *Service) generateIndexerDelegation(id did.DID) (delegation.Delegation, error) {
 	// the delegator creates a delegation for the storage node to invoke claim/cache w/ proof from indexer.
 	indxToStrgDelegation, err := delegation.Delegate(
 		s.signer,
@@ -197,6 +213,29 @@ func (s *Service) generateDelegation(id did.DID) (delegation.Delegation, error) 
 	}
 
 	return indxToStrgDelegation, nil
+}
+
+// generateEgressTrackerDelegation generates a delegation for the provider to interact with the egress tracking service
+func (s *Service) generateEgressTrackerDelegation(id did.DID) (delegation.Delegation, error) {
+	// Create a delegation for the storage node to interact with the egress tracking service
+	egressTrackerDelegation, err := delegation.Delegate(
+		s.signer,
+		id,
+		[]ucan.Capability[ucan.NoCaveats]{
+			ucan.NewCapability(
+				egress.TrackAbility,
+				s.egressTrackingServiceDID.String(),
+				ucan.NoCaveats{},
+			),
+		},
+		delegation.WithNoExpiration(),
+		delegation.WithProof(delegation.FromDelegation(s.egressTrackingServiceProof)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate delegation from egress tracking service to storage node: %w", err)
+	}
+
+	return egressTrackerDelegation, nil
 }
 
 func (s *Service) assertProofValid(proofString string, operator did.DID) error {

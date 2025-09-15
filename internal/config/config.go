@@ -20,10 +20,12 @@ func NewConfig() (*Config, error) {
 			Endpoint:              viper.GetString("store.endpoint"),
 		},
 		Delegator: DelegatorServiceConfig{
-			KeyFile:               viper.GetString("delegator.key_file"),
-			IndexingServiceWebDID: viper.GetString("delegator.indexing_service_web_did"),
-			IndexingServiceProof:  viper.GetString("delegator.indexing_service_proof"),
-			UploadServiceDID:      viper.GetString("delegator.upload_service_did"),
+			KeyFile:                    viper.GetString("delegator.key_file"),
+			IndexingServiceWebDID:      viper.GetString("delegator.indexing_service_web_did"),
+			IndexingServiceProof:       viper.GetString("delegator.indexing_service_proof"),
+			EgressTrackingServiceDID:   viper.GetString("delegator.egress_tracking_service_did"),
+			EgressTrackingServiceProof: viper.GetString("delegator.egress_tracking_service_proof"),
+			UploadServiceDID:           viper.GetString("delegator.upload_service_did"),
 		},
 	}
 
@@ -52,6 +54,12 @@ func NewConfig() (*Config, error) {
 	}
 	if cfg.Delegator.IndexingServiceProof == "" {
 		return nil, fmt.Errorf("delegator indexing service proof not set")
+	}
+	if cfg.Delegator.EgressTrackingServiceDID == "" {
+		return nil, fmt.Errorf("delegator egress tracking service did not set")
+	}
+	if cfg.Delegator.EgressTrackingServiceProof == "" {
+		return nil, fmt.Errorf("delegator egress tracking service proof not set")
 	}
 	if cfg.Delegator.UploadServiceDID == "" {
 		return nil, fmt.Errorf("delegator upload did not set")
@@ -96,8 +104,10 @@ type DynamoConfig struct {
 }
 
 type DelegatorServiceConfig struct {
-	KeyFile               string `mapstructure:"key_file"`
-	IndexingServiceWebDID string `mapstructure:"indexing_service_web_did"`
-	IndexingServiceProof  string `mapstructure:"indexing_service_proof"`
-	UploadServiceDID      string `mapstructure:"upload_service_did"`
+	KeyFile                    string `mapstructure:"key_file"`
+	IndexingServiceWebDID      string `mapstructure:"indexing_service_web_did"`
+	IndexingServiceProof       string `mapstructure:"indexing_service_proof"`
+	EgressTrackingServiceDID   string `mapstructure:"egress_tracking_service_did"`
+	EgressTrackingServiceProof string `mapstructure:"egress_tracking_service_proof"`
+	UploadServiceDID           string `mapstructure:"upload_service_did"`
 }

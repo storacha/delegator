@@ -110,7 +110,7 @@ func (h *Handlers) RequestProof(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "invalid DID")
 	}
 
-	resp, err := h.service.RequestProof(c.Request().Context(), operator)
+	indexerProof, _, err := h.service.RequestProofs(c.Request().Context(), operator)
 	if err != nil {
 		// TODO map the errors the service returns to http codes
 		return c.JSON(http.StatusBadRequest, map[string]string{
@@ -118,12 +118,65 @@ func (h *Handlers) RequestProof(c echo.Context) error {
 		})
 	}
 
-	proof, err := delegation.Format(resp)
+	indexerProofStr, err := delegation.Format(indexerProof)
 	if err != nil {
-		return c.String(http.StatusInternalServerError, "failed to read generated proof")
+		return c.String(http.StatusInternalServerError, "failed to read generated indexer proof")
 	}
 
-	return c.JSON(http.StatusOK, RequestProofResponse{Proof: proof})
+	return c.JSON(http.StatusOK, RequestProofResponse{Proof: indexerProofStr})
+}
+
+type RequestProofsRequest struct {
+	DID string `json:"did"`
+}
+
+type RequestProofsResponse struct {
+	Proofs Proofs `json:"proofs"`
+}
+
+type Proofs struct {
+	Indexer       string `json:"indexer"`
+	EgressTracker string `json:"egress_tracker"`
+}
+
+func (h *Handlers) RequestProofs(c echo.Context) error {
+	var req RequestProofsRequest
+	if err := c.Bind(&req); err != nil {
+		return c.String(http.StatusBadRequest, "invalid request body")
+	}
+
+	operator, err := did.Parse(req.DID)
+	if err != nil {
+		return c.String(http.StatusBadRequest, "invalid DID")
+	}
+
+	indexerProof, egressTrackerProof, err := h.service.RequestProofs(c.Request().Context(), operator)
+	if err != nil {
+		// Map service errors to appropriate HTTP status codes
+		status := http.StatusInternalServerError
+		if errors.Is(err, registrar.ErrDIDNotAllowed) || errors.Is(err, registrar.ErrDIDNotRegistered) {
+			status = http.StatusForbidden
+		}
+
+		return c.JSON(status, map[string]string{
+			"error": err.Error(),
+		})
+	}
+
+	indexerProofStr, err := delegation.Format(indexerProof)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "failed to read generated indexer proof")
+	}
+
+	egressTrackerProofStr, err := delegation.Format(egressTrackerProof)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "failed to read generated egress tracker proof")
+	}
+
+	return c.JSON(http.StatusOK, RequestProofsResponse{Proofs: Proofs{
+		Indexer:       indexerProofStr,
+		EgressTracker: egressTrackerProofStr,
+	}})
 }
 
 type IsRegisteredRequest struct {

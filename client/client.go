@@ -110,26 +110,29 @@ func (c *Client) IsRegistered(ctx context.Context, req *IsRegisteredRequest) (bo
 		}
 		return false, fmt.Errorf("check registration failed with status: %d", resp.StatusCode)
 	}
-
-	return true, nil
 }
 
-type RequestProofRequest struct {
+type RequestProofsRequest struct {
 	DID string `json:"did"`
 }
 
-type RequestProofResponse struct {
-	Proof string `json:"proof"`
+type RequestProofsResponse struct {
+	Proofs Proofs `json:"proofs"`
 }
 
-func (c *Client) RequestProof(ctx context.Context, did string) (*RequestProofResponse, error) {
-	req := &RequestProofRequest{DID: did}
+type Proofs struct {
+	Indexer       string `json:"indexer"`
+	EgressTracker string `json:"egress_tracker"`
+}
+
+func (c *Client) RequestProofs(ctx context.Context, did string) (*RequestProofsResponse, error) {
+	req := &RequestProofsRequest{DID: did}
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/registrar/request-proof", bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/registrar/request-proofs", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -151,7 +154,7 @@ func (c *Client) RequestProof(ctx context.Context, did string) (*RequestProofRes
 		return nil, fmt.Errorf("request proof failed with status: %d", resp.StatusCode)
 	}
 
-	var result RequestProofResponse
+	var result RequestProofsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}

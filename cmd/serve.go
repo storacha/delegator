@@ -32,6 +32,8 @@ var ServeCmd = &cobra.Command{
 				providers.ProvideSigner,
 				providers.ProvideIndexingServiceWebDID,
 				providers.ProvideIndexingServiceProof,
+				providers.ProvideEgressTrackingServiceDID,
+				providers.ProvideEgressTrackingServiceProof,
 				providers.ProvideUploadServiceDID,
 
 				// Store
@@ -73,6 +75,8 @@ func init() {
 	ServeCmd.Flags().String("delegator-key-file", "", "Path to delegator private key file")
 	ServeCmd.Flags().String("delegator-indexing-service-did", "", "DID of the indexing service")
 	ServeCmd.Flags().String("delegator-indexing-service-proof", "", "Path to proof file from indexing service")
+	ServeCmd.Flags().String("delegator-egress-tracking-service-did", "", "DID of the egress tracking service")
+	ServeCmd.Flags().String("delegator-egress-tracking-service-proof", "", "Path to proof file from egress tracking service")
 	ServeCmd.Flags().String("delegator-upload-service-did", "", "DID of the upload service")
 
 	// Bind flags to viper
@@ -88,5 +92,7 @@ func init() {
 	cobra.CheckErr(viper.BindPFlag("delegator.key_file", ServeCmd.Flags().Lookup("delegator-key-file")))
 	cobra.CheckErr(viper.BindPFlag("delegator.indexing_service_web_did", ServeCmd.Flags().Lookup("delegator-indexing-service-did")))
 	cobra.CheckErr(viper.BindPFlag("delegator.indexing_service_proof", ServeCmd.Flags().Lookup("delegator-indexing-service-proof")))
+	cobra.CheckErr(viper.BindPFlag("delegator.egress_tracking_service_did", ServeCmd.Flags().Lookup("delegator-egress-tracking-service-did")))
+	cobra.CheckErr(viper.BindPFlag("delegator.egress_tracking_service_proof", ServeCmd.Flags().Lookup("delegator-egress-tracking-service-proof")))
 	cobra.CheckErr(viper.BindPFlag("delegator.upload_service_did", ServeCmd.Flags().Lookup("delegator-upload-service-did")))
 }

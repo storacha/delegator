@@ -39,7 +39,8 @@ func (s *Server) setupRoutes() {
 	s.echo.GET("/health", s.handlers.HealthCheck)
 	s.echo.GET("/", s.handlers.Root)
 	s.echo.PUT("/registrar/register-node", s.handlers.Register)
-	s.echo.GET("/registrar/request-proof", s.handlers.RequestProof)
+	s.echo.GET("/registrar/request-proof", s.handlers.RequestProof) // TODO: legacy, remove when nobody uses it
+	s.echo.GET("/registrar/request-proofs", s.handlers.RequestProofs)
 	s.echo.GET("/registrar/is-registered", s.handlers.IsRegistered)
 	s.echo.POST("/benchmark/upload", s.handlers.BenchmarkUpload)
 	s.echo.POST("/benchmark/download", s.handlers.BenchmarkDownload)

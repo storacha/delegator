@@ -91,39 +91,8 @@ func (h *Handlers) Register(c echo.Context) error {
 	return c.NoContent(http.StatusCreated)
 }
 
-type RequestProofRequest struct {
-	DID string `json:"did"`
-}
-
-type RequestProofResponse struct {
-	Proof string `json:"proof"`
-}
-
 func (h *Handlers) RequestProof(c echo.Context) error {
-	var req RequestProofRequest
-	if err := c.Bind(&req); err != nil {
-		return c.String(http.StatusBadRequest, "invalid request body")
-	}
-
-	operator, err := did.Parse(req.DID)
-	if err != nil {
-		return c.String(http.StatusBadRequest, "invalid DID")
-	}
-
-	indexerProof, _, err := h.service.RequestProofs(c.Request().Context(), operator)
-	if err != nil {
-		// TODO map the errors the service returns to http codes
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": err.Error(),
-		})
-	}
-
-	indexerProofStr, err := delegation.Format(indexerProof)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "failed to read generated indexer proof")
-	}
-
-	return c.JSON(http.StatusOK, RequestProofResponse{Proof: indexerProofStr})
+	return c.String(http.StatusGone, "this endpoint is deprecated, use /registrar/request-proofs instead")
 }
 
 type RequestProofsRequest struct {

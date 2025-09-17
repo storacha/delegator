@@ -15,8 +15,8 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
-	github.com/storacha/go-libstoracha v0.2.0
-	github.com/storacha/go-ucanto v0.4.2
+	github.com/storacha/go-libstoracha v0.2.6
+	github.com/storacha/go-ucanto v0.5.0
 	go.uber.org/fx v1.23.0
 )
 

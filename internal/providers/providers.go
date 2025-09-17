@@ -133,8 +133,45 @@ type IndexingServiceProofResult struct {
 func ProvideIndexingServiceProof(params IndexingServiceProofParams) (IndexingServiceProofResult, error) {
 	proof, err := delegation.Parse(params.Config.Delegator.IndexingServiceProof)
 	if err != nil {
-		return IndexingServiceProofResult{}, fmt.Errorf("failed to parse proof: %w", err)
+		return IndexingServiceProofResult{}, fmt.Errorf("failed to parse indexing service proof: %w", err)
 	}
 
 	return IndexingServiceProofResult{IndexingServiceProof: proof}, nil
+}
+
+type EgressTrackingServiceDIDParams struct {
+	fx.In
+	Config *config.Config
+}
+
+type EgressTrackingServiceDIDResult struct {
+	fx.Out
+	EgressTrackingServiceDID did.DID `name:"egress_tracking_service_did"`
+}
+
+func ProvideEgressTrackingServiceDID(params EgressTrackingServiceDIDParams) (EgressTrackingServiceDIDResult, error) {
+	parsedDID, err := did.Parse(params.Config.Delegator.EgressTrackingServiceDID)
+	if err != nil {
+		return EgressTrackingServiceDIDResult{}, fmt.Errorf("failed to parse egress tracking service DID: %w", err)
+	}
+
+	return EgressTrackingServiceDIDResult{EgressTrackingServiceDID: parsedDID}, nil
+}
+
+type EgressTrackingServiceProofParams struct {
+	fx.In
+	Config *config.Config
+}
+
+type EgressTrackingServiceProofResult struct {
+	fx.Out
+	EgressTrackingServiceProof delegation.Delegation `name:"egress_tracking_service_proof"`
+}
+
+func ProvideEgressTrackingServiceProof(params EgressTrackingServiceProofParams) (EgressTrackingServiceProofResult, error) {
+	proof, err := delegation.Parse(params.Config.Delegator.EgressTrackingServiceProof)
+	if err != nil {
+		return EgressTrackingServiceProofResult{}, fmt.Errorf("failed to parse egress tracking service proof: %w", err)
+	}
+	return EgressTrackingServiceProofResult{EgressTrackingServiceProof: proof}, nil
 }

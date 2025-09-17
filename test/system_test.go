@@ -19,6 +19,7 @@ import (
 	"github.com/storacha/go-libstoracha/capabilities/blob/replica"
 	"github.com/storacha/go-libstoracha/capabilities/claim"
 	"github.com/storacha/go-libstoracha/capabilities/pdp"
+	"github.com/storacha/go-libstoracha/capabilities/space/egress"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
@@ -157,6 +158,25 @@ func generateIndexingProof(t *testing.T, indexingSigner, delegatorSigner princip
 	return dlg
 }
 
+func generateEgressTrackingProof(t *testing.T, egressTrackingSigner, delegatorSigner principal.Signer) delegation.Delegation {
+	dlg, err := delegation.Delegate(
+		egressTrackingSigner,
+		delegatorSigner.DID(),
+		[]ucan.Capability[ucan.NoCaveats]{
+			ucan.NewCapability(
+				egress.TrackAbility,
+				egressTrackingSigner.DID().String(),
+				ucan.NoCaveats{},
+			),
+		},
+		delegation.WithNoExpiration(),
+	)
+	if err != nil {
+		t.Fatalf("failed to create indexing proof: %v", err)
+	}
+	return dlg
+}
+
 // mockStorageNode simulates a storage node server
 type mockStorageNode struct {
 	server  *httptest.Server
@@ -230,14 +250,18 @@ func (n *mockStorageNode) url() string {
 }
 
 // Test server setup
-func setupTestServer(t *testing.T, mockStore *mockStore) (*fxtest.App, string, principal.Signer, principal.Signer, principal.Signer) {
+func setupTestServer(t *testing.T, mockStore *mockStore) (*fxtest.App, string, principal.Signer, principal.Signer, principal.Signer, principal.Signer) {
 	// Generate test signers
 	delegatorSigner := generateTestSigner(t)
 	indexingSigner := generateTestSigner(t)
+	egressTrackingSigner := generateTestSigner(t)
 	uploadSigner := generateTestSigner(t)
 
 	// Generate indexing proof
 	indexingProof := generateIndexingProof(t, indexingSigner, delegatorSigner)
+
+	// Generate egress tracking proof
+	egressTrackingProof := generateEgressTrackingProof(t, egressTrackingSigner, delegatorSigner)
 
 	// Get a free port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -254,8 +278,9 @@ func setupTestServer(t *testing.T, mockStore *mockStore) (*fxtest.App, string, p
 			Port: port,
 		},
 		Delegator: config.DelegatorServiceConfig{
-			IndexingServiceWebDID: indexingSigner.DID().String(),
-			UploadServiceDID:      uploadSigner.DID().String(),
+			IndexingServiceWebDID:    indexingSigner.DID().String(),
+			EgressTrackingServiceDID: egressTrackingSigner.DID().String(),
+			UploadServiceDID:         uploadSigner.DID().String(),
 		},
 	}
 
@@ -265,12 +290,17 @@ func setupTestServer(t *testing.T, mockStore *mockStore) (*fxtest.App, string, p
 			func() *config.Config { return testConfig },
 			func() store.Store { return mockStore },
 			func() principal.Signer { return delegatorSigner },
-			func() (did.DID, error) {
-				return did.Parse(indexingSigner.DID().String())
-			},
 			fx.Annotate(
-				func(d did.DID) did.DID { return d },
+				func() (did.DID, error) {
+					return did.Parse(indexingSigner.DID().String())
+				},
 				fx.ResultTags(`name:"indexing_service_web_did"`),
+			),
+			fx.Annotate(
+				func() (did.DID, error) {
+					return did.Parse(egressTrackingSigner.DID().String())
+				},
+				fx.ResultTags(`name:"egress_tracking_service_did"`),
 			),
 			fx.Annotate(
 				func() did.DID { return uploadSigner.DID() },
@@ -279,6 +309,10 @@ func setupTestServer(t *testing.T, mockStore *mockStore) (*fxtest.App, string, p
 			fx.Annotate(
 				func() delegation.Delegation { return indexingProof },
 				fx.ResultTags(`name:"indexing_service_proof"`),
+			),
+			fx.Annotate(
+				func() delegation.Delegation { return egressTrackingProof },
+				fx.ResultTags(`name:"egress_tracking_service_proof"`),
 			),
 			registrar.New,
 			benchmark.New,
@@ -301,12 +335,12 @@ func setupTestServer(t *testing.T, mockStore *mockStore) (*fxtest.App, string, p
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return app, serverURL, delegatorSigner, indexingSigner, uploadSigner
+	return app, serverURL, delegatorSigner, indexingSigner, egressTrackingSigner, uploadSigner
 }
 
 func TestSystemHealthCheck(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, _, _, _ := setupTestServer(t, mockStore)
+	app, serverURL, _, _, _, _ := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	// Create client
@@ -325,7 +359,7 @@ func TestSystemHealthCheck(t *testing.T) {
 
 func TestSystemRegistrationFlow(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, _, _, uploadSigner := setupTestServer(t, mockStore)
+	app, serverURL, _, _, _, uploadSigner := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	// Create client
@@ -411,7 +445,7 @@ func TestSystemRegistrationFlow(t *testing.T) {
 
 func TestSystemIsRegistered(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, _, _, uploadSigner := setupTestServer(t, mockStore)
+	app, serverURL, _, _, _, uploadSigner := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	// Create client
@@ -470,9 +504,9 @@ func TestSystemIsRegistered(t *testing.T) {
 	})
 }
 
-func TestSystemRequestProof(t *testing.T) {
+func TestSystemRequestProofs(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, delegatorSigner, indexingSigner, uploadSigner := setupTestServer(t, mockStore)
+	app, serverURL, delegatorSigner, indexingSigner, egressTrackingSigner, uploadSigner := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	// Create client
@@ -505,41 +539,76 @@ func TestSystemRequestProof(t *testing.T) {
 		t.Fatalf("registration failed: %v", err)
 	}
 
-	t.Run("request proof for registered DID", func(t *testing.T) {
-		resp, err := c.RequestProof(ctx, storageNode.did.String())
+	t.Run("request proofs for registered DID", func(t *testing.T) {
+		resp, err := c.RequestProofs(ctx, storageNode.did.String())
 		if err != nil {
 			t.Fatalf("request proof failed: %v", err)
 		}
-		if resp.Proof == "" {
-			t.Fatal("expected proof to be returned")
+
+		// Verify indexer proof
+		if resp.Proofs.Indexer == "" {
+			t.Fatal("expected indexer proof to be returned")
 		}
 
 		// Verify the proof is valid
-		dlg, err := delegation.Parse(resp.Proof)
+		indxrDlg, err := delegation.Parse(resp.Proofs.Indexer)
 		if err != nil {
-			t.Fatalf("failed to parse returned proof: %v", err)
+			t.Fatalf("failed to parse returned indexer proof: %v", err)
 		}
 
 		// Verify issuer is the delegator
-		if dlg.Issuer().DID().String() != delegatorSigner.DID().String() {
-			t.Fatalf("unexpected proof issuer: got %s, want %s", dlg.Issuer().DID().String(), delegatorSigner.DID().String())
+		if indxrDlg.Issuer().DID().String() != delegatorSigner.DID().String() {
+			t.Fatalf("unexpected indexer proof issuer: got %s, want %s", indxrDlg.Issuer().DID().String(), delegatorSigner.DID().String())
 		}
 
 		// Verify audience is the storage node
-		if dlg.Audience().DID().String() != storageNode.did.String() {
-			t.Fatalf("unexpected proof audience: got %s, want %s", dlg.Audience().DID().String(), storageNode.did.String())
+		if indxrDlg.Audience().DID().String() != storageNode.did.String() {
+			t.Fatalf("unexpected indexer proof audience: got %s, want %s", indxrDlg.Audience().DID().String(), storageNode.did.String())
 		}
 
 		// Verify capability
-		caps := dlg.Capabilities()
+		caps := indxrDlg.Capabilities()
 		if len(caps) != 1 {
-			t.Fatalf("unexpected number of capabilities: got %d, want 1", len(caps))
+			t.Fatalf("unexpected number of capabilities in indexer proof: got %d, want 1", len(caps))
 		}
 		if caps[0].Can() != claim.CacheAbility {
-			t.Fatalf("unexpected capability: got %s, want %s", caps[0].Can(), claim.CacheAbility)
+			t.Fatalf("unexpected capability in indexer proof: got %s, want %s", caps[0].Can(), claim.CacheAbility)
 		}
 		if caps[0].With() != indexingSigner.DID().String() {
-			t.Fatalf("unexpected capability resource: got %s, want %s", caps[0].With(), indexingSigner.DID().String())
+			t.Fatalf("unexpected capability resource in indexer proof: got %s, want %s", caps[0].With(), indexingSigner.DID().String())
+		}
+
+		// Verify egress tracker proof
+		if resp.Proofs.EgressTracker == "" {
+			t.Fatal("expected egress tracker proof to be returned")
+		}
+
+		// Verify the proof is valid
+		etrackerDlg, err := delegation.Parse(resp.Proofs.EgressTracker)
+		if err != nil {
+			t.Fatalf("failed to parse returned egress tracker proof: %v", err)
+		}
+
+		// Verify issuer is the delegator
+		if etrackerDlg.Issuer().DID().String() != delegatorSigner.DID().String() {
+			t.Fatalf("unexpected egress tracker proof issuer: got %s, want %s", etrackerDlg.Issuer().DID().String(), delegatorSigner.DID().String())
+		}
+
+		// Verify audience is the storage node
+		if etrackerDlg.Audience().DID().String() != storageNode.did.String() {
+			t.Fatalf("unexpected egress tracker proof audience: got %s, want %s", etrackerDlg.Audience().DID().String(), storageNode.did.String())
+		}
+
+		// Verify capability
+		caps = etrackerDlg.Capabilities()
+		if len(caps) != 1 {
+			t.Fatalf("unexpected number of capabilities in egress tracker proof: got %d, want 1", len(caps))
+		}
+		if caps[0].Can() != egress.TrackAbility {
+			t.Fatalf("unexpected capability in egress tracker proof: got %s, want %s", caps[0].Can(), egress.TrackAbility)
+		}
+		if caps[0].With() != egressTrackingSigner.DID().String() {
+			t.Fatalf("unexpected capability resource in indexer proof: got %s, want %s", caps[0].With(), egressTrackingSigner.DID().String())
 		}
 	})
 
@@ -547,7 +616,7 @@ func TestSystemRequestProof(t *testing.T) {
 		unregisteredSigner := generateTestSigner(t)
 		mockStore.allowDID(unregisteredSigner.DID()) // Allow but don't register
 
-		_, err := c.RequestProof(ctx, unregisteredSigner.DID().String())
+		_, err := c.RequestProofs(ctx, unregisteredSigner.DID().String())
 		if err == nil {
 			t.Fatal("expected request proof to fail for unregistered DID")
 		}
@@ -557,7 +626,7 @@ func TestSystemRequestProof(t *testing.T) {
 		unauthorizedSigner := generateTestSigner(t)
 		// Don't allow this DID
 
-		_, err := c.RequestProof(ctx, unauthorizedSigner.DID().String())
+		_, err := c.RequestProofs(ctx, unauthorizedSigner.DID().String())
 		if err == nil {
 			t.Fatal("expected request proof to fail for unauthorized DID")
 		}
@@ -566,7 +635,7 @@ func TestSystemRequestProof(t *testing.T) {
 
 func TestSystemEndToEndWorkflow(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, _, _, uploadSigner := setupTestServer(t, mockStore)
+	app, serverURL, _, _, _, uploadSigner := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	// Create client
@@ -596,7 +665,7 @@ func TestSystemEndToEndWorkflow(t *testing.T) {
 	}
 
 	// Step 2: Try to request proof before registration (should fail)
-	_, err = c.RequestProof(ctx, storageNode.did.String())
+	_, err = c.RequestProofs(ctx, storageNode.did.String())
 	if err == nil {
 		t.Fatal("expected request proof to fail before registration")
 	}
@@ -630,27 +699,38 @@ func TestSystemEndToEndWorkflow(t *testing.T) {
 	}
 
 	// Step 5: Request proof after registration (should succeed)
-	proofResp, err := c.RequestProof(ctx, storageNode.did.String())
+	proofResp, err := c.RequestProofs(ctx, storageNode.did.String())
 	if err != nil {
 		t.Fatalf("request proof failed: %v", err)
 	}
-	if proofResp.Proof == "" {
-		t.Fatal("expected proof to be returned")
+	if proofResp.Proofs.Indexer == "" {
+		t.Fatal("expected indexer proof to be returned")
+	}
+	if proofResp.Proofs.EgressTracker == "" {
+		t.Fatal("expected egress tracker proof to be returned")
 	}
 
-	// Step 6: Verify the proof can be parsed and is valid
-	dlg, err := delegation.Parse(proofResp.Proof)
+	// Step 6: Verify the proofs can be parsed and are valid
+	dlg, err := delegation.Parse(proofResp.Proofs.Indexer)
 	if err != nil {
-		t.Fatalf("failed to parse proof: %v", err)
+		t.Fatalf("failed to parse indexer proof: %v", err)
 	}
 	if dlg.Audience().DID().String() != storageNode.did.String() {
-		t.Fatalf("proof audience mismatch: got %s, want %s", dlg.Audience().DID().String(), storageNode.did.String())
+		t.Fatalf("indexer proof audience mismatch: got %s, want %s", dlg.Audience().DID().String(), storageNode.did.String())
+	}
+
+	dlg, err = delegation.Parse(proofResp.Proofs.EgressTracker)
+	if err != nil {
+		t.Fatalf("failed to parse egress tracker proof: %v", err)
+	}
+	if dlg.Audience().DID().String() != storageNode.did.String() {
+		t.Fatalf("egress tracker proof audience mismatch: got %s, want %s", dlg.Audience().DID().String(), storageNode.did.String())
 	}
 }
 
 func TestSystemInvalidRequests(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, _, _, _ := setupTestServer(t, mockStore)
+	app, serverURL, _, _, _, _ := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	ctx := context.Background()

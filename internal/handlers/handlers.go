@@ -71,6 +71,9 @@ func (h *Handlers) Register(c echo.Context) error {
 		PublicURL:     *endpoint,
 		Proof:         req.Proof,
 	}); err != nil {
+		if errors.Is(err, registrar.ErrContractProviderNotRegistered) {
+			return c.String(http.StatusUnprocessableEntity, "Provider not registered with smart-contract, must register first")
+		}
 		if errors.Is(err, registrar.ErrDIDNotAllowed) {
 			return c.String(http.StatusForbidden, "DID not allowed to register, contact Storacha team for help registering")
 		}
@@ -266,4 +269,68 @@ func (h *Handlers) BenchmarkDownload(c echo.Context) error {
 	return c.JSON(http.StatusOK, BenchmarkDownloadResponse{
 		DownloadDuration: result.DownloadDuration.String(),
 	})
+}
+
+// ContractApprovalRequest represents a request to approve a provider for registration
+// before full registration with the Storacha network.
+type ContractApprovalRequest struct {
+	// DID is the decentralized identifier of the operator requesting approval
+	DID string `json:"did"`
+	// OwnerAddress is the Ethereum address of the provider owner (hex format)
+	OwnerAddress string `json:"owner_address"`
+	// Signature is the cryptographic signature proving ownership/authorization
+	Signature []byte `json:"signature"`
+}
+
+// RequestContractApproval handles HTTP requests for contract approval. It validates
+// the operator's DID, owner address, and signature, then processes the approval request
+// through the registrar service. The provider must already be registered with the
+// smart contract and be on the allow list before approval can be granted.
+//
+// Returns:
+//   - 204 No Content on success
+//   - 400 Bad Request for invalid input (DID, owner address, signature, or public URL)
+//   - 403 Forbidden if the DID is not on the allow list
+//   - 422 Unprocessable Entity if the provider is not registered with the smart contract
+//   - 500 Internal Server Error for unexpected errors
+func (h *Handlers) RequestContractApproval(c echo.Context) error {
+	var req ContractApprovalRequest
+	if err := c.Bind(&req); err != nil {
+		return c.String(http.StatusBadRequest, "invalid request body")
+	}
+
+	// parse and validate request
+	operator, err := did.Parse(req.DID)
+	if err != nil {
+		return c.String(http.StatusBadRequest, "invalid DID")
+	}
+	if !common.IsHexAddress(req.OwnerAddress) {
+		return c.String(http.StatusBadRequest, "invalid OwnerAddress")
+	}
+	if len(req.Signature) == 0 {
+		return c.String(http.StatusBadRequest, "invalid signature")
+	}
+	if err := h.service.RequestContractApproval(c.Request().Context(), registrar.RequestApprovalParams{
+		DID:          operator,
+		OwnerAddress: common.HexToAddress(req.OwnerAddress),
+		Signature:    req.Signature,
+	}); err != nil {
+		if errors.Is(err, registrar.ErrContractProviderNotRegistered) {
+			return c.String(http.StatusUnprocessableEntity, "Provider not registered with smart-contract, must register first")
+		}
+		if errors.Is(err, registrar.ErrDIDNotAllowed) {
+			return c.String(http.StatusForbidden, "DID not allowed to register, contact Storacha team for help registering")
+		}
+		if errors.Is(err, registrar.ErrInvalidDID) {
+			return c.String(http.StatusBadRequest, "invalid DID")
+		}
+		if errors.Is(err, registrar.ErrInvalidSignature) {
+			return c.String(http.StatusBadRequest, "signature is invalid")
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }

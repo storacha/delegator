@@ -1,13 +1,22 @@
 package providers
 
 import (
+	"context"
 	crypto_ed25519 "crypto/ed25519"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/storacha/delegator/internal/services/registrar"
+	"github.com/storacha/forgectl/pkg/services/chain"
+	"github.com/storacha/forgectl/pkg/services/inspector"
+	"github.com/storacha/forgectl/pkg/services/operator"
+	"github.com/storacha/forgectl/pkg/services/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
@@ -174,4 +183,46 @@ func ProvideEgressTrackingServiceProof(params EgressTrackingServiceProofParams) 
 		return EgressTrackingServiceProofResult{}, fmt.Errorf("failed to parse egress tracking service proof: %w", err)
 	}
 	return EgressTrackingServiceProofResult{EgressTrackingServiceProof: proof}, nil
+}
+
+type SmartContractOperator struct {
+	o *operator.Service
+}
+
+func (s *SmartContractOperator) IsRegisteredProvider(ctx context.Context, provider common.Address) (bool, error) {
+	return s.o.RegistryContract.IsRegisteredProvider(&bind.CallOpts{Context: ctx}, provider)
+}
+
+func (s *SmartContractOperator) GetProviderByAddress(ctx context.Context, provider common.Address) (*types.ProviderInfo, error) {
+	return s.o.GetProviderByAddress(ctx, provider)
+}
+
+func (s *SmartContractOperator) ApproveProvider(ctx context.Context, id uint64) (*types.ApprovalResult, error) {
+	return s.o.ApproveProvider(ctx, id)
+}
+
+func ProviderContractOperator(cfg config.ContractOperatorConfig) (registrar.ContractOperator, error) {
+	in, err := inspector.New(inspector.Config{
+		ClientEndpoint:          cfg.ChainClientEndpoint,
+		PaymentsContractAddress: common.HexToAddress(cfg.PaymentsContractAddress),
+		ServiceContractAddress:  common.HexToAddress(cfg.ServiceContractAddress),
+		ProviderRegistryAddress: common.HexToAddress(cfg.RegistryContractAddress),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize contract inspector: %w", err)
+	}
+	txtr, err := chain.NewTransactor(big.NewInt(cfg.Transactor.ChainID), chain.TransactorConfig{
+		KeystorePath:     cfg.Transactor.KeystorePath,
+		KeystorePassword: cfg.Transactor.KeystorePassword,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize contract transactor: %w", err)
+	}
+
+	op, err := operator.New(in, txtr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize contract operator: %w", err)
+	}
+
+	return &SmartContractOperator{o: op}, nil
 }

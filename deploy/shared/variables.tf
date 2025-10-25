@@ -19,3 +19,7 @@ variable "create_shared_dev_resources" {
   default = false
 }
 
+
+variable "cloudflare_zone_id" {
+  type = string
+}

@@ -5,7 +5,7 @@
   "port": 0,
   "js": null,
   "domainBase": "",
-  "cloudflare": false,
+  "cloudflare": true,
   "createDB": false,
   "caches": null,
   "topics": null,

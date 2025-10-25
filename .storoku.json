@@ -22,6 +22,8 @@
     }
   ],
   "tables": null,
-  "networks": null,
+  "networks": [
+    "warm"
+  ],
   "writeToContainer": false
 }

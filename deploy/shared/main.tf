@@ -56,7 +56,7 @@ module "shared" {
   }
   create_db = false
   caches = []
-  networks = []
+  networks = ["warm",]
   app = var.app
   create_shared_dev_resources = var.create_shared_dev_resources
   zone_id = ""

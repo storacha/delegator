@@ -261,10 +261,10 @@ delegator:
 ```
 
 ### Environment Variables
-All configuration values can be set via environment variables with the prefix `DELEGATOR_`:
+All configuration values can be set via environment variables with the prefix `REGISTRAR_`:
 ```bash
-export DELEGATOR_SERVER_PORT=9090
-export DELEGATOR_STORE_REGION=us-west-2
+export REGISTRAR_SERVER_PORT=9090
+export REGISTRAR_STORE_REGION=us-west-2
 ```
 
 ## Development
@@ -280,5 +280,5 @@ export DELEGATOR_STORE_REGION=us-west-2
 docker run -p 8000:8000 amazon/dynamodb-local -jar DynamoDBLocal.jar -sharedDb
 
 # Configure for local development
-export DELEGATOR_STORE_ENDPOINT=localhost:8000
+export REGISTRAR_STORE_ENDPOINT=localhost:8000
 ```

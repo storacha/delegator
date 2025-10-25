@@ -17,7 +17,7 @@ import (
 var ServeCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start the HTTP server",
-	Long:  `Start the delegator HTTP server with configured endpoints.`,
+	Long:  `Start the registrar HTTP server with configured endpoints.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		app := fx.New(
 			fx.Provide(

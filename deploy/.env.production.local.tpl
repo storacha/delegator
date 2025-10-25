@@ -1,6 +1,30 @@
-# Place any environment variables you want to available to your docker container 
-# here. If you want to use different values based on terraform vars or other 
-# values in env.terraform.tpl, this script is processed by ESH 
-# (https://github.com/jirutka/esh) and copied to env.production.local before it 
-# is used, so you can use that functionality to interpolate variables and 
-# generally do conditional rendering based on bash scripting.
+<%
+if [ "$TF_WORKSPACE" == "prod" ]; then
+  REGISTRAR_STORE_REGION="us-west-2"
+  REGISTRAR_STORE_ALLOWLIST_TABLE_NAME="delegator-storage-provider-allow-list"
+  REGISTRAR_STORE_PROVIDERINFO_TABLE_NAME="upload-api-storage-provider"
+  REGISTRAR_STORE_PROVIDERWEIGHT=0
+
+  REGISTRAR_DELEGATOR_INDEXING_SERVICE_WEB_DID="did:web:indexer.storacha.network"
+  REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_DID="did:web:etracker.storacha.network"
+  REGISTRAR_DELEGATOR_UPLOAD_SERVICE_DID="did:web:up.storacha.network"
+else
+  REGISTRAR_STORE_REGION="us-east-2"
+  REGISTRAR_STORE_ALLOWLIST_TABLE_NAME="staging-warm-delegator-storage-provider-allow-list"
+  REGISTRAR_STORE_PROVIDERINFO_TABLE_NAME="staging-warm-upload-api-storage-provider"
+  REGISTRAR_STORE_PROVIDERWEIGHT=0
+
+  REGISTRAR_DELEGATOR_INDEXING_SERVICE_WEB_DID="did:web:staging.indexer.warm.storacha.network"
+  REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_DID="did:web:staging.etracker.warm.storacha.network"
+  REGISTRAR_DELEGATOR_UPLOAD_SERVICE_DID="did:web:staging.up.warm.storacha.network"
+fi
+%>
+
+REGISTRAR_STORE_REGION=<%= $REGISTRAR_STORE_REGION %>
+REGISTRAR_STORE_ALLOWLIST_TABLE_NAME=<%= $REGISTRAR_STORE_ALLOWLIST_TABLE_NAME %>
+REGISTRAR_STORE_PROVIDERINFO_TABLE_NAME=<%= $REGISTRAR_STORE_PROVIDERINFO_TABLE_NAME %>
+REGISTRAR_STORE_PROVIDERWEIGHT=<%= $REGISTRAR_STORE_PROVIDERWEIGHT %>
+
+REGISTRAR_DELEGATOR_INDEXING_SERVICE_WEB_DID=<%= $REGISTRAR_DELEGATOR_INDEXING_SERVICE_WEB_DID %>
+REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_DID=<%= $REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_DID %>
+REGISTRAR_DELEGATOR_UPLOAD_SERVICE_DID=<%= $REGISTRAR_DELEGATOR_UPLOAD_SERVICE_DID %>

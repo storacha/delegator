@@ -59,7 +59,6 @@ var ServeCmd = &cobra.Command{
 }
 
 func init() {
-
 	// Server flags
 	ServeCmd.Flags().String("host", "0.0.0.0", "Server host")
 	ServeCmd.Flags().Int("port", 8080, "Server port")

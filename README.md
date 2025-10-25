@@ -34,7 +34,7 @@ Simple root endpoint for basic connectivity check.
 **Response:**
 - `200 OK` - Returns plain text "hello"
 
-#### `GET /health`
+#### `GET /healthcheck`
 Health check endpoint for monitoring service availability.
 
 **Response:**

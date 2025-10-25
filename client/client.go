@@ -163,7 +163,7 @@ func (c *Client) RequestProofs(ctx context.Context, did string) (*RequestProofsR
 }
 
 func (c *Client) HealthCheck(ctx context.Context) error {
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/health", nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/healthcheck", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

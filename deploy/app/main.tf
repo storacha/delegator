@@ -58,6 +58,8 @@ module "app" {
   # enter secret values your app will use here -- these will be available
   # as env vars in the container at runtime
   secrets = { 
+    "REGISTRAR_DELEGATOR_INDEXING_SERVICE_PROOF" = var.indexing_service_proof
+    "REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_PROOF" = var.egress_tracking_service_proof
   }
   # enter any sqs queues you want to create here
   queues = []

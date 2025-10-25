@@ -50,3 +50,13 @@ variable "network" {
   type        = string
   default     = "hot"
 }
+
+variable "indexing_service_proof" {
+  description = "value for registrar_delegator_indexing_service_proof secret"
+  type = string
+}
+
+variable "egress_tracking_service_proof" {
+  description = "value for registrar_delegator_egress_tracking_service_proof secret"
+  type = string
+}

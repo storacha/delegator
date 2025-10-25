@@ -32,6 +32,8 @@ jobs:
   #     aws-region: ${{ secrets.STAGING_AWS_REGION }}
   #     region: ${{ secrets.STAGING_AWS_REGION }}
   #     private-key: ${{ secrets.STAGING_PRIVATE_KEY }}
+  #     indexing-service-proof: ${{ secrets.STAGING_INDEXING_SERVICE_PROOF }}
+  #     egress-tracking-service-proof: ${{ secrets.STAGING_EGRESS_TRACKING_SERVICE_PROOF }}
   #     cloudflare-zone-id: ${{ secrets.STAGING_CLOUDFLARE_ZONE_ID }}
   #     cloudflare-api-token: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
 
@@ -48,6 +50,8 @@ jobs:
       aws-region: ${{ secrets.WARM_STAGING_AWS_REGION }}
       region: ${{ secrets.WARM_STAGING_AWS_REGION }}
       private-key: ${{ secrets.WARM_STAGING_PRIVATE_KEY }}
+      indexing-service-proof: ${{ secrets.WARM_STAGING_INDEXING_SERVICE_PROOF }}
+      egress-tracking-service-proof: ${{ secrets.WARM_STAGING_EGRESS_TRACKING_SERVICE_PROOF }}
       cloudflare-zone-id: ${{ secrets.WARM_STAGING_CLOUDFLARE_ZONE_ID }}
       cloudflare-api-token: ${{ secrets.WARM_STAGING_CLOUDFLARE_API_TOKEN }}
 
@@ -64,5 +68,7 @@ jobs:
   #     aws-region: ${{ secrets.PROD_AWS_REGION }}
   #     region: ${{ secrets.PROD_AWS_REGION }}
   #     private-key: ${{ secrets.PROD_PRIVATE_KEY }}
+  #     indexing-service-proof: ${{ secrets.PROD_INDEXING_SERVICE_PROOF }}
+  #     egress-tracking-service-proof: ${{ secrets.PROD_EGRESS_TRACKING_SERVICE_PROOF }}
   #     cloudflare-zone-id: ${{ secrets.PROD_CLOUDFLARE_ZONE_ID }}
   #     cloudflare-api-token: ${{ secrets.PROD_CLOUDFLARE_API_TOKEN }}

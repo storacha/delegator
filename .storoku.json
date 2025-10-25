@@ -11,7 +11,16 @@
   "topics": null,
   "queues": null,
   "buckets": null,
-  "secrets": null,
+  "secrets": [
+    {
+      "name": "REGISTRAR_DELEGATOR_INDEXING_SERVICE_PROOF",
+      "variable": true
+    },
+    {
+      "name": "REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_PROOF",
+      "variable": true
+    }
+  ],
   "tables": null,
   "networks": null,
   "writeToContainer": false

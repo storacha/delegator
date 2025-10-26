@@ -48,23 +48,26 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("store provider info table not set")
 	}
 
+	if cfg.Delegator.Key == "" && cfg.Delegator.KeyFile == "" {
+		return nil, fmt.Errorf("either delegator key or key file must be set")
+	}
 	if cfg.Delegator.DID == "" {
-		return nil, fmt.Errorf("delegator did not set")
+		return nil, fmt.Errorf("delegator DID not set")
 	}
 	if cfg.Delegator.IndexingServiceWebDID == "" {
-		return nil, fmt.Errorf("delegator indexing service did not set")
+		return nil, fmt.Errorf("delegator indexing service DID not set")
 	}
 	if cfg.Delegator.IndexingServiceProof == "" {
 		return nil, fmt.Errorf("delegator indexing service proof not set")
 	}
 	if cfg.Delegator.EgressTrackingServiceDID == "" {
-		return nil, fmt.Errorf("delegator egress tracking service did not set")
+		return nil, fmt.Errorf("delegator egress tracking service DID not set")
 	}
 	if cfg.Delegator.EgressTrackingServiceProof == "" {
 		return nil, fmt.Errorf("delegator egress tracking service proof not set")
 	}
 	if cfg.Delegator.UploadServiceDID == "" {
-		return nil, fmt.Errorf("delegator upload did not set")
+		return nil, fmt.Errorf("delegator upload service DID not set")
 	}
 
 	return cfg, nil

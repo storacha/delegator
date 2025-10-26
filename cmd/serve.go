@@ -73,8 +73,6 @@ func init() {
 	// Service flags
 	ServeCmd.Flags().String("delegator-key", "", "Multibase-encoded delegator private key")
 	ServeCmd.Flags().String("delegator-key-file", "", "Path to delegator private key file")
-	ServeCmd.MarkFlagsMutuallyExclusive("delegator-key", "delegator-key-file")
-	ServeCmd.MarkFlagsOneRequired("delegator-key", "delegator-key-file")
 	ServeCmd.Flags().String("delegator-did", "", "DID web of the delegator")
 
 	ServeCmd.Flags().String("delegator-indexing-service-did", "", "DID of the indexing service")

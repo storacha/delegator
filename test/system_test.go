@@ -357,6 +357,29 @@ func TestSystemHealthCheck(t *testing.T) {
 	}
 }
 
+func TestSystemDIDDocument(t *testing.T) {
+	mockStore := newMockStore()
+	app, serverURL, delegatorSigner, _, _, _ := setupTestServer(t, mockStore)
+	defer app.RequireStop()
+
+	// Create client
+	c, err := client.New(serverURL)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	// Test DID document endpoint
+	ctx := context.Background()
+	doc, err := c.DIDDocument(ctx)
+	if err != nil {
+		t.Fatalf("get did document failed: %v", err)
+	}
+
+	if doc.ID != delegatorSigner.DID().String() {
+		t.Fatalf("unexpected id: got %s, want %s", doc.ID, delegatorSigner.DID().String())
+	}
+}
+
 func TestSystemRegistrationFlow(t *testing.T) {
 	mockStore := newMockStore()
 	app, serverURL, _, _, _, uploadSigner := setupTestServer(t, mockStore)

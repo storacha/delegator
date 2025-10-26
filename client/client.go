@@ -181,6 +181,46 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+type DIDDocumentResponse struct {
+	Context            []string             `json:"@context"` // https://w3id.org/did/v1
+	ID                 string               `json:"id"`
+	Controller         []string             `json:"controller,omitempty"`
+	VerificationMethod []VerificationMethod `json:"verificationMethod,omitempty"`
+	Authentication     []string             `json:"authentication,omitempty"`
+	AssertionMethod    []string             `json:"assertionMethod,omitempty"`
+}
+
+type VerificationMethod struct {
+	ID                 string `json:"id,omitempty"`
+	Type               string `json:"type,omitempty"`
+	Controller         string `json:"controller,omitempty"`
+	PublicKeyMultibase string `json:"publicKeyMultibase,omitempty"`
+}
+
+func (c *Client) DIDDocument(ctx context.Context) (*DIDDocumentResponse, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/.well-known/did.json", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get did document failed with status: %d", resp.StatusCode)
+	}
+
+	var result DIDDocumentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
 type BenchmarkUploadRequest struct {
 	OperatorDID      string `json:"operator_did"`
 	OperatorEndpoint string `json:"operator_endpoint"`

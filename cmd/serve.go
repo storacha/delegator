@@ -71,7 +71,12 @@ func init() {
 	ServeCmd.Flags().String("store-endpoint", "", "DynamoDB endpoint (for local testing)")
 
 	// Service flags
+	ServeCmd.Flags().String("delegator-key", "", "Multibase-encoded delegator private key")
 	ServeCmd.Flags().String("delegator-key-file", "", "Path to delegator private key file")
+	ServeCmd.MarkFlagsMutuallyExclusive("delegator-key", "delegator-key-file")
+	ServeCmd.MarkFlagsOneRequired("delegator-key", "delegator-key-file")
+	ServeCmd.Flags().String("delegator-did", "", "DID web of the delegator")
+
 	ServeCmd.Flags().String("delegator-indexing-service-did", "", "DID of the indexing service")
 	ServeCmd.Flags().String("delegator-indexing-service-proof", "", "Path to proof file from indexing service")
 	ServeCmd.Flags().String("delegator-egress-tracking-service-did", "", "DID of the egress tracking service")
@@ -88,7 +93,9 @@ func init() {
 	cobra.CheckErr(viper.BindPFlag("store.providerweight", ServeCmd.Flags().Lookup("store-provider-weight")))
 	cobra.CheckErr(viper.BindPFlag("store.endpoint", ServeCmd.Flags().Lookup("store-endpoint")))
 
+	cobra.CheckErr(viper.BindPFlag("delegator.key", ServeCmd.Flags().Lookup("delegator-key")))
 	cobra.CheckErr(viper.BindPFlag("delegator.key_file", ServeCmd.Flags().Lookup("delegator-key-file")))
+	cobra.CheckErr(viper.BindPFlag("delegator.did", ServeCmd.Flags().Lookup("delegator-did")))
 	cobra.CheckErr(viper.BindPFlag("delegator.indexing_service_web_did", ServeCmd.Flags().Lookup("delegator-indexing-service-did")))
 	cobra.CheckErr(viper.BindPFlag("delegator.indexing_service_proof", ServeCmd.Flags().Lookup("delegator-indexing-service-proof")))
 	cobra.CheckErr(viper.BindPFlag("delegator.egress_tracking_service_did", ServeCmd.Flags().Lookup("delegator-egress-tracking-service-did")))

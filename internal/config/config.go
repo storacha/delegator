@@ -20,7 +20,9 @@ func NewConfig() (*Config, error) {
 			Endpoint:              viper.GetString("store.endpoint"),
 		},
 		Delegator: DelegatorServiceConfig{
+			Key:                        viper.GetString("delegator.key"),
 			KeyFile:                    viper.GetString("delegator.key_file"),
+			DID:                        viper.GetString("delegator.did"),
 			IndexingServiceWebDID:      viper.GetString("delegator.indexing_service_web_did"),
 			IndexingServiceProof:       viper.GetString("delegator.indexing_service_proof"),
 			EgressTrackingServiceDID:   viper.GetString("delegator.egress_tracking_service_did"),
@@ -46,8 +48,8 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("store provider info table not set")
 	}
 
-	if cfg.Delegator.KeyFile == "" {
-		return nil, fmt.Errorf("delegator key file not set")
+	if cfg.Delegator.DID == "" {
+		return nil, fmt.Errorf("delegator did not set")
 	}
 	if cfg.Delegator.IndexingServiceWebDID == "" {
 		return nil, fmt.Errorf("delegator indexing service did not set")
@@ -104,7 +106,9 @@ type DynamoConfig struct {
 }
 
 type DelegatorServiceConfig struct {
+	Key                        string `mapstructure:"key"`
 	KeyFile                    string `mapstructure:"key_file"`
+	DID                        string `mapstructure:"did"`
 	IndexingServiceWebDID      string `mapstructure:"indexing_service_web_did"`
 	IndexingServiceProof       string `mapstructure:"indexing_service_proof"`
 	EgressTrackingServiceDID   string `mapstructure:"egress_tracking_service_did"`

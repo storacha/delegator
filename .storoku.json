@@ -1,7 +1,7 @@
 {
   "app": "registrar",
-  "privateKeyEnvVar": "",
-  "didEnvVar": "",
+  "privateKeyEnvVar": "REGISTRAR_DELEGATOR_KEY",
+  "didEnvVar": "REGISTRAR_DELEGATOR_DID",
   "port": 0,
   "js": null,
   "domainBase": "",

@@ -51,6 +51,9 @@ func NewConfig() (*Config, error) {
 	if cfg.Delegator.Key == "" && cfg.Delegator.KeyFile == "" {
 		return nil, fmt.Errorf("either delegator key or key file must be set")
 	}
+	if cfg.Delegator.Key != "" && cfg.Delegator.KeyFile != "" {
+		return nil, fmt.Errorf("both delegator key and key file are set, please provide only one")
+	}
 	if cfg.Delegator.DID == "" {
 		return nil, fmt.Errorf("delegator DID not set")
 	}

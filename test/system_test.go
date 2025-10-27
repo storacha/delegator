@@ -35,6 +35,7 @@ import (
 	"github.com/storacha/delegator/internal/services/benchmark"
 	"github.com/storacha/delegator/internal/services/registrar"
 	"github.com/storacha/delegator/internal/store"
+	forgetypes "github.com/storacha/forgectl/pkg/services/types"
 )
 
 // mockStore implements the store.Store interface for testing
@@ -250,12 +251,15 @@ func (n *mockStorageNode) url() string {
 }
 
 // Test server setup
-func setupTestServer(t *testing.T, mockStore *mockStore) (*fxtest.App, string, principal.Signer, principal.Signer, principal.Signer, principal.Signer) {
+func setupTestServer(t *testing.T, mockStore *mockStore) (*fxtest.App, string, principal.Signer, principal.Signer, principal.Signer, principal.Signer, *mockContractOperator) {
 	// Generate test signers
 	delegatorSigner := generateTestSigner(t)
 	indexingSigner := generateTestSigner(t)
 	egressTrackingSigner := generateTestSigner(t)
 	uploadSigner := generateTestSigner(t)
+
+	// Create mock contract operator
+	mockContractOp := newMockContractOperator()
 
 	// Generate indexing proof
 	indexingProof := generateIndexingProof(t, indexingSigner, delegatorSigner)
@@ -314,6 +318,7 @@ func setupTestServer(t *testing.T, mockStore *mockStore) (*fxtest.App, string, p
 				func() delegation.Delegation { return egressTrackingProof },
 				fx.ResultTags(`name:"egress_tracking_service_proof"`),
 			),
+			func() registrar.ContractOperator { return mockContractOp },
 			registrar.New,
 			benchmark.New,
 			handlers.NewHandlers,
@@ -335,12 +340,12 @@ func setupTestServer(t *testing.T, mockStore *mockStore) (*fxtest.App, string, p
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return app, serverURL, delegatorSigner, indexingSigner, egressTrackingSigner, uploadSigner
+	return app, serverURL, delegatorSigner, indexingSigner, egressTrackingSigner, uploadSigner, mockContractOp
 }
 
 func TestSystemHealthCheck(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, _, _, _, _ := setupTestServer(t, mockStore)
+	app, serverURL, _, _, _, _, _ := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	// Create client
@@ -359,7 +364,7 @@ func TestSystemHealthCheck(t *testing.T) {
 
 func TestSystemRegistrationFlow(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, _, _, _, uploadSigner := setupTestServer(t, mockStore)
+	app, serverURL, _, _, _, uploadSigner, _ := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	// Create client
@@ -385,7 +390,7 @@ func TestSystemRegistrationFlow(t *testing.T) {
 	// Test registration
 	t.Run("successful registration", func(t *testing.T) {
 		err = c.Register(ctx, &client.RegisterRequest{
-			DID:           storageNode.did.String(),
+			Operator:      storageNode.did.String(),
 			OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 			ProofSetID:    1,
 			OperatorEmail: "test@example.com",
@@ -408,7 +413,7 @@ func TestSystemRegistrationFlow(t *testing.T) {
 
 	t.Run("duplicate registration should fail", func(t *testing.T) {
 		err = c.Register(ctx, &client.RegisterRequest{
-			DID:           storageNode.did.String(),
+			Operator:      storageNode.did.String(),
 			OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 			ProofSetID:    1,
 			OperatorEmail: "test@example.com",
@@ -430,7 +435,7 @@ func TestSystemRegistrationFlow(t *testing.T) {
 			unauthorizedSigner.DID())
 
 		err = c.Register(ctx, &client.RegisterRequest{
-			DID:           unauthorizedSigner.DID().String(),
+			Operator:      unauthorizedSigner.DID().String(),
 			OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 			ProofSetID:    1,
 			OperatorEmail: "test@example.com",
@@ -445,7 +450,7 @@ func TestSystemRegistrationFlow(t *testing.T) {
 
 func TestSystemIsRegistered(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, _, _, _, uploadSigner := setupTestServer(t, mockStore)
+	app, serverURL, _, _, _, uploadSigner, _ := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	// Create client
@@ -467,7 +472,7 @@ func TestSystemIsRegistered(t *testing.T) {
 
 	// Register the node
 	err = c.Register(ctx, &client.RegisterRequest{
-		DID:           storageNode.did.String(),
+		Operator:      storageNode.did.String(),
 		OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 		ProofSetID:    1,
 		OperatorEmail: "test@example.com",
@@ -506,7 +511,7 @@ func TestSystemIsRegistered(t *testing.T) {
 
 func TestSystemRequestProofs(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, delegatorSigner, indexingSigner, egressTrackingSigner, uploadSigner := setupTestServer(t, mockStore)
+	app, serverURL, delegatorSigner, indexingSigner, egressTrackingSigner, uploadSigner, _ := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	// Create client
@@ -528,7 +533,7 @@ func TestSystemRequestProofs(t *testing.T) {
 
 	// Register the node
 	err = c.Register(ctx, &client.RegisterRequest{
-		DID:           storageNode.did.String(),
+		Operator:      storageNode.did.String(),
 		OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 		ProofSetID:    1,
 		OperatorEmail: "test@example.com",
@@ -635,7 +640,7 @@ func TestSystemRequestProofs(t *testing.T) {
 
 func TestSystemEndToEndWorkflow(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, _, _, _, uploadSigner := setupTestServer(t, mockStore)
+	app, serverURL, _, _, _, uploadSigner, _ := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	// Create client
@@ -676,7 +681,7 @@ func TestSystemEndToEndWorkflow(t *testing.T) {
 		storageNode.did)
 
 	err = c.Register(ctx, &client.RegisterRequest{
-		DID:           storageNode.did.String(),
+		Operator:      storageNode.did.String(),
 		OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 		ProofSetID:    1,
 		OperatorEmail: "test@example.com",
@@ -730,7 +735,7 @@ func TestSystemEndToEndWorkflow(t *testing.T) {
 
 func TestSystemInvalidRequests(t *testing.T) {
 	mockStore := newMockStore()
-	app, serverURL, _, _, _, _ := setupTestServer(t, mockStore)
+	app, serverURL, _, _, _, _, _ := setupTestServer(t, mockStore)
 	defer app.RequireStop()
 
 	ctx := context.Background()
@@ -778,18 +783,11 @@ func TestSystemInvalidRequests(t *testing.T) {
 			wantCode: http.StatusBadRequest,
 		},
 		{
-			name:     "malformed JSON in request-proof",
+			name:     "deprecated method registrar/request-proof returns 410",
 			method:   "GET",
 			endpoint: "/registrar/request-proof",
 			body:     `{"invalid json`,
-			wantCode: http.StatusBadRequest,
-		},
-		{
-			name:     "invalid DID in request-proof",
-			method:   "GET",
-			endpoint: "/registrar/request-proof",
-			body:     `{"did": "not-a-did"}`,
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusGone,
 		},
 	}
 
@@ -812,4 +810,170 @@ func TestSystemInvalidRequests(t *testing.T) {
 			}
 		})
 	}
+}
+
+// mockContractOperator implements the registrar.ContractOperator interface for testing
+type mockContractOperator struct {
+	mu                  sync.RWMutex
+	registeredProviders map[string]*forgetypes.ProviderInfo
+	approvedProviders   map[uint64]bool
+	nextProviderID      uint64
+}
+
+func newMockContractOperator() *mockContractOperator {
+	return &mockContractOperator{
+		registeredProviders: make(map[string]*forgetypes.ProviderInfo),
+		approvedProviders:   make(map[uint64]bool),
+		nextProviderID:      1,
+	}
+}
+
+func (m *mockContractOperator) IsRegisteredProvider(ctx context.Context, provider common.Address) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	_, exists := m.registeredProviders[provider.String()]
+	return exists, nil
+}
+
+func (m *mockContractOperator) GetProviderByAddress(ctx context.Context, provider common.Address) (*forgetypes.ProviderInfo, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	info, exists := m.registeredProviders[provider.String()]
+	if !exists {
+		return nil, fmt.Errorf("provider not found")
+	}
+	return info, nil
+}
+
+func (m *mockContractOperator) ApproveProvider(ctx context.Context, id uint64) (*forgetypes.ApprovalResult, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.approvedProviders[id] = true
+	return &forgetypes.ApprovalResult{
+		ProviderID:      id,
+		TransactionHash: common.HexToHash("0x1234567890abcdef"),
+	}, nil
+}
+
+func (m *mockContractOperator) registerProvider(address common.Address, isApproved bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id := m.nextProviderID
+	m.nextProviderID++
+	m.registeredProviders[address.String()] = &forgetypes.ProviderInfo{
+		ID:         id,
+		IsApproved: isApproved,
+	}
+}
+
+func TestSystemRequestContractApproval(t *testing.T) {
+	mockStore := newMockStore()
+	app, serverURL, _, _, _, _, mockContractOp := setupTestServer(t, mockStore)
+	defer app.RequireStop()
+
+	// Create client
+	c, err := client.New(serverURL)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Test provider address
+	testAddress := common.HexToAddress("0x1234567890123456789012345678901234567890")
+
+	t.Run("successful contract approval", func(t *testing.T) {
+		// Create a test signer
+		signer := generateTestSigner(t)
+		mockStore.allowDID(signer.DID())
+		mockContractOp.registerProvider(testAddress, false) // Register but not yet approved
+
+		// Sign the DID with the signer's private key to prove ownership
+		signature := signer.Sign(signer.DID().Bytes())
+
+		err = c.RequestApproval(ctx, &client.RequestApprovalRequest{
+			Operator:     signer.DID().String(),
+			OwnerAddress: testAddress.String(),
+			Signature:    signature.Raw(),
+		})
+		if err != nil {
+			t.Fatalf("contract approval failed: %v", err)
+		}
+	})
+
+	t.Run("DID not in allow list", func(t *testing.T) {
+		// Create a test signer but don't add to allow list
+		signer := generateTestSigner(t)
+		testAddr := common.HexToAddress("0x2234567890123456789012345678901234567890")
+
+		signature := signer.Sign(signer.DID().Bytes())
+
+		err = c.RequestApproval(ctx, &client.RequestApprovalRequest{
+			Operator:     signer.DID().String(),
+			OwnerAddress: testAddr.String(),
+			Signature:    signature.Raw(),
+		})
+		if err == nil {
+			t.Fatal("expected contract approval to fail for DID not in allow list")
+		}
+	})
+
+	t.Run("invalid signature", func(t *testing.T) {
+		// Create a test signer and add to allow list
+		signer := generateTestSigner(t)
+		mockStore.allowDID(signer.DID())
+		testAddr := common.HexToAddress("0x3234567890123456789012345678901234567890")
+		mockContractOp.registerProvider(testAddr, false)
+
+		// Use an invalid signature
+		invalidSignature := make([]byte, 64)
+
+		err = c.RequestApproval(ctx, &client.RequestApprovalRequest{
+			Operator:     signer.DID().String(),
+			OwnerAddress: testAddr.String(),
+			Signature:    invalidSignature,
+		})
+		if err == nil {
+			t.Fatal("expected contract approval to fail with invalid signature")
+		}
+	})
+
+	t.Run("provider not registered with contract", func(t *testing.T) {
+		// Create a test signer and add to allow list but don't register with contract
+		signer := generateTestSigner(t)
+		mockStore.allowDID(signer.DID())
+		testAddr := common.HexToAddress("0x4234567890123456789012345678901234567890")
+		// Do NOT register with contract
+
+		signature := signer.Sign(signer.DID().Bytes())
+
+		err = c.RequestApproval(ctx, &client.RequestApprovalRequest{
+			Operator:     signer.DID().String(),
+			OwnerAddress: testAddr.String(),
+			Signature:    signature.Raw(),
+		})
+		if err == nil {
+			t.Fatal("expected contract approval to fail for provider not registered with contract")
+		}
+	})
+
+	t.Run("already approved provider (idempotent)", func(t *testing.T) {
+		// Create a test signer
+		signer := generateTestSigner(t)
+		mockStore.allowDID(signer.DID())
+		testAddr := common.HexToAddress("0x5234567890123456789012345678901234567890")
+		mockContractOp.registerProvider(testAddr, true) // Already approved
+
+		signature := signer.Sign(signer.DID().Bytes())
+
+		// Should succeed even if already approved (idempotent behavior)
+		err = c.RequestApproval(ctx, &client.RequestApprovalRequest{
+			Operator:     signer.DID().String(),
+			OwnerAddress: testAddr.String(),
+			Signature:    signature.Raw(),
+		})
+		if err != nil {
+			t.Fatalf("contract approval failed for already approved provider: %v", err)
+		}
+	})
 }

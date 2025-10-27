@@ -34,8 +34,45 @@ func (c *Client) WithHTTPClient(httpClient *http.Client) *Client {
 	return c
 }
 
+type RequestApprovalRequest struct {
+	Operator     string `json:"operator"`
+	OwnerAddress string `json:"owner_address"`
+	Signature    []byte `json:"signature"`
+}
+
+func (c *Client) RequestApproval(ctx context.Context, req *RequestApprovalRequest) error {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/registrar/request-approval", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		var errResp map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errResp); err == nil {
+			if errMsg, ok := errResp["error"]; ok {
+				return fmt.Errorf("registration failed: %s", errMsg)
+			}
+		}
+		return fmt.Errorf("registration failed with status: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 type RegisterRequest struct {
-	DID           string `json:"did"`
+	Operator      string `json:"operator"`
 	OwnerAddress  string `json:"owner_address"`
 	ProofSetID    uint64 `json:"proof_set_id"`
 	OperatorEmail string `json:"operator_email"`

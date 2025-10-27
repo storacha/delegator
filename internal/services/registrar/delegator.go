@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/storacha/forgectl/pkg/services/types"
 	"github.com/storacha/go-libstoracha/capabilities/blob"
 	"github.com/storacha/go-libstoracha/capabilities/blob/replica"
 	"github.com/storacha/go-libstoracha/capabilities/claim"
@@ -21,7 +22,9 @@ import (
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
+	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
 	"github.com/storacha/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/ucan/crypto/signature"
 	"go.uber.org/fx"
 
 	"github.com/storacha/delegator/internal/store"
@@ -30,12 +33,20 @@ import (
 var log = logging.Logger("service/delegator")
 
 var (
+	// for the unexpected
+	ErrInternal = errors.New("internal error")
+
 	// we use these to return valid http codes from the handlers using this service
 	ErrDIDNotAllowed        = errors.New("did not is not allowed to register")
 	ErrDIDAlreadyRegistered = errors.New("did already registered")
 	ErrDIDNotRegistered     = errors.New("did not registered")
 	ErrBadEndpoint          = errors.New("did not found at endpoint")
 	ErrInvalidProof         = errors.New("invalid proof")
+	ErrInvalidDID           = errors.New("invalid did")
+	ErrInvalidSignature     = errors.New("invalid signature")
+
+	// blockchain/smartcontract errors
+	ErrContractProviderNotRegistered = errors.New("storage provider not registered with registry contract")
 )
 
 type Service struct {
@@ -50,6 +61,8 @@ type Service struct {
 	egressTrackingServiceProof delegation.Delegation
 
 	uploadServiceDID did.DID
+
+	contractOperator ContractOperator
 }
 
 type ServiceParams struct {
@@ -73,6 +86,8 @@ type ServiceParams struct {
 
 	// the did of the upload service, used for validating operator proofs are correct
 	UploadServiceDID did.DID `name:"upload_service_did"`
+
+	ContractOperator ContractOperator
 }
 
 func New(p ServiceParams) *Service {
@@ -84,6 +99,7 @@ func New(p ServiceParams) *Service {
 		egressTrackingServiceDID:   p.EgressTrackingServiceDID,
 		egressTrackingServiceProof: p.EgressTrackingServiceProof,
 		uploadServiceDID:           p.UploadServiceDID,
+		contractOperator:           p.ContractOperator,
 	}
 }
 
@@ -112,6 +128,8 @@ func (s *Service) Register(ctx context.Context, req RegisterParams) error {
 		return fmt.Errorf("failed to check if DID is registered: %w", err)
 	}
 	if registered {
+		// TODO we may consider allowing this to succeede, if the contract is re-deployed then they need to reregister
+		// alternative is we are good about clearing dynamo table across redeploys of contract
 		return ErrDIDAlreadyRegistered
 	}
 
@@ -353,4 +371,100 @@ func assertEndpointServesDID(ctx context.Context, endpoint url.URL, expectedDID 
 	}
 
 	return true, nil
+}
+
+type ContractOperator interface {
+	IsRegisteredProvider(ctx context.Context, provider common.Address) (bool, error)
+	GetProviderByAddress(ctx context.Context, provider common.Address) (*types.ProviderInfo, error)
+	ApproveProvider(ctx context.Context, id uint64) (*types.ApprovalResult, error)
+}
+
+// RequestApprovalParams contains the parameters required to request contract approval
+// for a storage provider in the Storacha network.
+type RequestApprovalParams struct {
+	// DID is the decentralized identifier of the operator requesting approval
+	Operator did.DID
+	// OwnerAddress is the Ethereum address of the provider owner on the blockchain
+	OwnerAddress common.Address
+	// Signature is the cryptographic signature of the DID signed with the DID's private key,
+	// used to prove ownership of the DID
+	Signature []byte
+}
+
+// NB(forrest): this is a temporary solution until a decision here is reached:
+// https://www.notion.so/storacha/Storacha-Forge-Contract-Billing-Operations-Design-Questions-28b5305b552480d08ea7c8a1ff077a2d?source=copy_link#28f5305b5524801e95e9f556ca7d8a9e
+
+// RequestContractApproval processes a contract approval request for a storage provider.
+// This method performs several validation steps before approving the provider on the blockchain:
+//
+//  1. Verifies the DID is in the allow list
+//  2. Validates the signature to prove DID ownership (provider signs their own DID with its private key)
+//  3. Confirms the provider is registered with the smart contract
+//  4. Checks if the provider is already approved to avoid duplicate approval calls
+//  5. If not approved, submits an approval transaction to the blockchain
+//
+// The approval process is NOT idempotent at the contract level - repeated calls to approve
+// the same provider will fail. This method handles that by checking approval status first.
+//
+// Returns:
+//   - nil on success (provider is approved)
+//   - ErrDIDNotAllowed if the DID is not in the allow list
+//   - ErrInvalidDID if the DID format is invalid
+//   - ErrInvalidSignature if the signature verification fails
+//   - ErrContractProviderNotRegistered if the provider is not registered with the smart contract
+//   - ErrInternal for unexpected errors (database failures, contract call failures, etc.)
+func (s *Service) RequestContractApproval(ctx context.Context, req RequestApprovalParams) error {
+	// first check if the DID is in the allow list
+	allowed, err := s.store.IsAllowedDID(ctx, req.Operator)
+	if err != nil {
+		log.Errorw("failed to check if DID is allowed", "DID", req.Operator, "error", err)
+		return ErrInternal
+	}
+	if !allowed {
+		return ErrDIDNotAllowed
+	}
+
+	// next validate they own the DID they claim
+	v, err := verifier.Parse(req.Operator.String())
+	if err != nil {
+		return ErrInvalidDID
+	}
+	// providers sign their own DID with its private key, here we verify the signature.
+	if !v.Verify(req.Operator.Bytes(), signature.NewSignature(signature.EdDSA, req.Signature)) {
+		// logging since this may represent someone doing something nasty!
+		log.Errorw("failed to verify DID", "DID", req.Operator, "signature", req.Signature)
+		return ErrInvalidSignature
+	}
+
+	// check if the provider is registered with the contract, they must have register to be approved.
+	registered, err := s.contractOperator.IsRegisteredProvider(ctx, req.OwnerAddress)
+	if err != nil {
+		log.Errorw("failed to check if provider is registered with contract", "address", req.OwnerAddress, "error", err)
+		return ErrInternal
+	}
+	// if they are not registered bail, cannot be approved till registered
+	if !registered {
+		return ErrContractProviderNotRegistered
+	}
+	// they are registered, check if they have already been approved.
+	providerInfo, err := s.contractOperator.GetProviderByAddress(ctx, req.OwnerAddress)
+	if err != nil {
+		// failure here is an internal error, so log it
+		log.Errorw("failed to get provider info", "error", err)
+		return ErrInternal
+	}
+	// contract approval calls are NOT idempotent, repeated calls to approve fail, so only approve if unapproved
+	if !providerInfo.IsApproved {
+		// approve the provider
+		res, err := s.contractOperator.ApproveProvider(ctx, providerInfo.ID)
+		if err != nil {
+			// failure here is an internal error, so log it
+			log.Errorw("failed to approve provider", "error", err)
+			return ErrInternal
+		}
+		// TODO probably don't wanna log the whole receipt, but whatever
+		log.Infow("provider approved with contract", "providerID", res.ProviderID, "transaction", res.TransactionHash, "receipt", res.Receipt)
+	}
+	// the provider is approved if we reach this point, success!
+	return nil
 }

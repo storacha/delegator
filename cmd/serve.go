@@ -19,15 +19,14 @@ var ServeCmd = &cobra.Command{
 	Short: "Start the HTTP server",
 	Long:  `Start the registrar HTTP server with configured endpoints.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.NewConfig()
+		if err != nil {
+			return err
+		}
 		app := fx.New(
+			// Configuration
+			config.SupplyConfigs(cfg),
 			fx.Provide(
-				// Configuration
-				config.NewConfig,
-
-				func(cfg *config.Config) config.DynamoConfig {
-					return cfg.Store
-				},
-
 				// Providers for complex types
 				providers.ProvideSigner,
 				providers.ProvideIndexingServiceWebDID,
@@ -35,6 +34,7 @@ var ServeCmd = &cobra.Command{
 				providers.ProvideEgressTrackingServiceDID,
 				providers.ProvideEgressTrackingServiceProof,
 				providers.ProvideUploadServiceDID,
+				providers.ProvideContractOperator,
 
 				// Store
 				fx.Annotate(
@@ -57,6 +57,11 @@ var ServeCmd = &cobra.Command{
 		return nil
 	},
 }
+
+const (
+	FilecoinCalibrationNetworkChainID       = 314159
+	FilecoinCalibrationNetworkChainEndpoint = "https://api.calibration.node.glif.io/rpc/v1"
+)
 
 func init() {
 	// Server flags
@@ -81,6 +86,15 @@ func init() {
 	ServeCmd.Flags().String("delegator-egress-tracking-service-proof", "", "Path to proof file from egress tracking service")
 	ServeCmd.Flags().String("delegator-upload-service-did", "", "DID of the upload service")
 
+	// Contract operator flags
+	ServeCmd.Flags().String("contract-chain-client-endpoint", FilecoinCalibrationNetworkChainEndpoint, "Blockchain client RPC endpoint URL")
+	ServeCmd.Flags().String("contract-payments-contract-address", "", "Ethereum address of the payments contract")
+	ServeCmd.Flags().String("contract-service-contract-address", "", "Ethereum address of the service contract")
+	ServeCmd.Flags().String("contract-registry-contract-address", "", "Ethereum address of the registry contract")
+	ServeCmd.Flags().Int64("contract-transactor-chain-id", FilecoinCalibrationNetworkChainID, "Chain ID for blockchain transactions")
+	ServeCmd.Flags().String("contract-transactor-keystore-path", "", "Path to Ethereum keystore file for transaction signing")
+	ServeCmd.Flags().String("contract-transactor-keystore-password", "", "Password for the Ethereum keystore file")
+
 	// Bind flags to viper
 	cobra.CheckErr(viper.BindPFlag("server.host", ServeCmd.Flags().Lookup("host")))
 	cobra.CheckErr(viper.BindPFlag("server.port", ServeCmd.Flags().Lookup("port")))
@@ -99,4 +113,12 @@ func init() {
 	cobra.CheckErr(viper.BindPFlag("delegator.egress_tracking_service_did", ServeCmd.Flags().Lookup("delegator-egress-tracking-service-did")))
 	cobra.CheckErr(viper.BindPFlag("delegator.egress_tracking_service_proof", ServeCmd.Flags().Lookup("delegator-egress-tracking-service-proof")))
 	cobra.CheckErr(viper.BindPFlag("delegator.upload_service_did", ServeCmd.Flags().Lookup("delegator-upload-service-did")))
+
+	cobra.CheckErr(viper.BindPFlag("contract.chain_client_endpoint", ServeCmd.Flags().Lookup("contract-chain-client-endpoint")))
+	cobra.CheckErr(viper.BindPFlag("contract.payments_contract_address", ServeCmd.Flags().Lookup("contract-payments-contract-address")))
+	cobra.CheckErr(viper.BindPFlag("contract.service_contract_address", ServeCmd.Flags().Lookup("contract-service-contract-address")))
+	cobra.CheckErr(viper.BindPFlag("contract.registry_contract_address", ServeCmd.Flags().Lookup("contract-registry-contract-address")))
+	cobra.CheckErr(viper.BindPFlag("contract.transactor.chain_id", ServeCmd.Flags().Lookup("contract-transactor-chain-id")))
+	cobra.CheckErr(viper.BindPFlag("contract.transactor.keystore_path", ServeCmd.Flags().Lookup("contract-transactor-keystore-path")))
+	cobra.CheckErr(viper.BindPFlag("contract.transactor.keystore_password", ServeCmd.Flags().Lookup("contract-transactor-keystore-password")))
 }

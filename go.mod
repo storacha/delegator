@@ -15,7 +15,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.21.0
-	github.com/storacha/forgectl v0.0.0-20251022225752-551a891800b0
+	github.com/storacha/forgectl v0.0.0-20251027201253-0fc088ad13a9
 	github.com/storacha/go-libstoracha v0.2.6
 	github.com/storacha/go-ucanto v0.5.0
 	go.uber.org/fx v1.23.0

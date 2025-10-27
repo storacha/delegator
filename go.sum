@@ -692,6 +692,8 @@ github.com/storacha/filecoin-services/go v0.0.1 h1:o5y+s9fVzVJy8pO8zmo1zDyObwaEU
 github.com/storacha/filecoin-services/go v0.0.1/go.mod h1:defpuuds8wN2Ag2rJH/InaARxfY49LXsP7V+RjCYhUY=
 github.com/storacha/forgectl v0.0.0-20251022225752-551a891800b0 h1:Y0IuDdT4QMSrMu242XOih1bQS7S0dCHg/lAPA18/ZNg=
 github.com/storacha/forgectl v0.0.0-20251022225752-551a891800b0/go.mod h1:76W7kAIxOBD72FFhaa8QwnDNnz+11CcVYM7qEx57vPQ=
+github.com/storacha/forgectl v0.0.0-20251027201253-0fc088ad13a9 h1:k64tLh3m9ZgGkSUPHnZS841GQYu5+134bxNr1+ymMtk=
+github.com/storacha/forgectl v0.0.0-20251027201253-0fc088ad13a9/go.mod h1:76W7kAIxOBD72FFhaa8QwnDNnz+11CcVYM7qEx57vPQ=
 github.com/storacha/go-libstoracha v0.2.6 h1:UlRr6OqdiRFYf6WsvVEsWQvWOHj2zKvTdTeyDn7PK0g=
 github.com/storacha/go-libstoracha v0.2.6/go.mod h1:zzeqIZhBBuWR2dkGygYqv4Bhg3JsvHuuvDCcdXCwGhg=
 github.com/storacha/go-ucanto v0.5.0 h1:BCYfTOjJ7DxmoGwpZn4N1XITWj1BdKIbk5Ok7kMoQ6I=

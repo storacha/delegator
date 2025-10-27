@@ -31,15 +31,10 @@ type DynamoDB struct {
 func NewDynamoDBStore(config config.DynamoConfig) (*DynamoDB, error) {
 	ctx := context.Background()
 
-	// Create custom config resolver if endpoint is specified
+	// Use custom BaseEndpoint if endpoint is specified
 	var opts []func(*awsconfig.LoadOptions) error
 	if config.Endpoint != "" {
-		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-			return aws.Endpoint{
-				URL: config.Endpoint,
-			}, nil
-		})
-		opts = append(opts, awsconfig.WithEndpointResolverWithOptions(customResolver))
+		opts = append(opts, awsconfig.WithBaseEndpoint(config.Endpoint))
 
 		opts = append(opts, awsconfig.WithCredentialsProvider(credentials.StaticCredentialsProvider{
 			Value: aws.Credentials{
@@ -160,7 +155,7 @@ func (d *DynamoDB) initialize(ctx context.Context, cfg config.DynamoConfig) erro
 	d.initialized = true
 	log.Infow("DynamoDB store initialized",
 		"region", d.db.Options().Region,
-		"endpoint", d.db.Options().EndpointResolver)
+		"endpoint", d.db.Options().BaseEndpoint)
 	return nil
 }
 

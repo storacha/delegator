@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/labstack/echo/v4"
 	"github.com/storacha/delegator/internal/services/benchmark"
 	"github.com/storacha/delegator/internal/services/registrar"
@@ -36,7 +37,7 @@ func (h *Handlers) Root(c echo.Context) error {
 }
 
 type RegisterRequest struct {
-	DID           string `json:"did"`
+	Operator      string `json:"operator"`
 	OwnerAddress  string `json:"owner_address"`
 	ProofSetID    uint64 `json:"proof_set_id"`
 	OperatorEmail string `json:"operator_email"`
@@ -51,7 +52,7 @@ func (h *Handlers) Register(c echo.Context) error {
 	}
 
 	// parse and validate request
-	operator, err := did.Parse(req.DID)
+	operator, err := did.Parse(req.Operator)
 	if err != nil {
 		return c.String(http.StatusBadRequest, "invalid DID")
 	}
@@ -275,7 +276,7 @@ func (h *Handlers) BenchmarkDownload(c echo.Context) error {
 // before full registration with the Storacha network.
 type ContractApprovalRequest struct {
 	// DID is the decentralized identifier of the operator requesting approval
-	DID string `json:"did"`
+	Operator string `json:"operator"`
 	// OwnerAddress is the Ethereum address of the provider owner (hex format)
 	OwnerAddress string `json:"owner_address"`
 	// Signature is the cryptographic signature proving ownership/authorization
@@ -300,7 +301,7 @@ func (h *Handlers) RequestContractApproval(c echo.Context) error {
 	}
 
 	// parse and validate request
-	operator, err := did.Parse(req.DID)
+	operator, err := did.Parse(req.Operator)
 	if err != nil {
 		return c.String(http.StatusBadRequest, "invalid DID")
 	}
@@ -311,7 +312,7 @@ func (h *Handlers) RequestContractApproval(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "invalid signature")
 	}
 	if err := h.service.RequestContractApproval(c.Request().Context(), registrar.RequestApprovalParams{
-		DID:          operator,
+		Operator:     operator,
 		OwnerAddress: common.HexToAddress(req.OwnerAddress),
 		Signature:    req.Signature,
 	}); err != nil {
@@ -327,9 +328,8 @@ func (h *Handlers) RequestContractApproval(c echo.Context) error {
 		if errors.Is(err, registrar.ErrInvalidSignature) {
 			return c.String(http.StatusBadRequest, "signature is invalid")
 		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
-		})
+		log.Error("failed to request contract approval", "error", err)
+		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	return c.NoContent(http.StatusNoContent)

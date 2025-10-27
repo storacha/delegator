@@ -390,7 +390,7 @@ func TestSystemRegistrationFlow(t *testing.T) {
 	// Test registration
 	t.Run("successful registration", func(t *testing.T) {
 		err = c.Register(ctx, &client.RegisterRequest{
-			DID:           storageNode.did.String(),
+			Operator:      storageNode.did.String(),
 			OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 			ProofSetID:    1,
 			OperatorEmail: "test@example.com",
@@ -413,7 +413,7 @@ func TestSystemRegistrationFlow(t *testing.T) {
 
 	t.Run("duplicate registration should fail", func(t *testing.T) {
 		err = c.Register(ctx, &client.RegisterRequest{
-			DID:           storageNode.did.String(),
+			Operator:      storageNode.did.String(),
 			OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 			ProofSetID:    1,
 			OperatorEmail: "test@example.com",
@@ -435,7 +435,7 @@ func TestSystemRegistrationFlow(t *testing.T) {
 			unauthorizedSigner.DID())
 
 		err = c.Register(ctx, &client.RegisterRequest{
-			DID:           unauthorizedSigner.DID().String(),
+			Operator:      unauthorizedSigner.DID().String(),
 			OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 			ProofSetID:    1,
 			OperatorEmail: "test@example.com",
@@ -472,7 +472,7 @@ func TestSystemIsRegistered(t *testing.T) {
 
 	// Register the node
 	err = c.Register(ctx, &client.RegisterRequest{
-		DID:           storageNode.did.String(),
+		Operator:      storageNode.did.String(),
 		OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 		ProofSetID:    1,
 		OperatorEmail: "test@example.com",
@@ -533,7 +533,7 @@ func TestSystemRequestProofs(t *testing.T) {
 
 	// Register the node
 	err = c.Register(ctx, &client.RegisterRequest{
-		DID:           storageNode.did.String(),
+		Operator:      storageNode.did.String(),
 		OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 		ProofSetID:    1,
 		OperatorEmail: "test@example.com",
@@ -681,7 +681,7 @@ func TestSystemEndToEndWorkflow(t *testing.T) {
 		storageNode.did)
 
 	err = c.Register(ctx, &client.RegisterRequest{
-		DID:           storageNode.did.String(),
+		Operator:      storageNode.did.String(),
 		OwnerAddress:  common.HexToAddress("0x1234567890123456789012345678901234567890").String(),
 		ProofSetID:    1,
 		OperatorEmail: "test@example.com",
@@ -891,8 +891,8 @@ func TestSystemRequestContractApproval(t *testing.T) {
 		// Sign the DID with the signer's private key to prove ownership
 		signature := signer.Sign(signer.DID().Bytes())
 
-		err = c.RequestApproval(ctx, &client.RequestApproval{
-			DID:          signer.DID().String(),
+		err = c.RequestApproval(ctx, &client.RequestApprovalRequest{
+			Operator:     signer.DID().String(),
 			OwnerAddress: testAddress.String(),
 			Signature:    signature.Raw(),
 		})
@@ -908,8 +908,8 @@ func TestSystemRequestContractApproval(t *testing.T) {
 
 		signature := signer.Sign(signer.DID().Bytes())
 
-		err = c.RequestApproval(ctx, &client.RequestApproval{
-			DID:          signer.DID().String(),
+		err = c.RequestApproval(ctx, &client.RequestApprovalRequest{
+			Operator:     signer.DID().String(),
 			OwnerAddress: testAddr.String(),
 			Signature:    signature.Raw(),
 		})
@@ -928,8 +928,8 @@ func TestSystemRequestContractApproval(t *testing.T) {
 		// Use an invalid signature
 		invalidSignature := make([]byte, 64)
 
-		err = c.RequestApproval(ctx, &client.RequestApproval{
-			DID:          signer.DID().String(),
+		err = c.RequestApproval(ctx, &client.RequestApprovalRequest{
+			Operator:     signer.DID().String(),
 			OwnerAddress: testAddr.String(),
 			Signature:    invalidSignature,
 		})
@@ -947,8 +947,8 @@ func TestSystemRequestContractApproval(t *testing.T) {
 
 		signature := signer.Sign(signer.DID().Bytes())
 
-		err = c.RequestApproval(ctx, &client.RequestApproval{
-			DID:          signer.DID().String(),
+		err = c.RequestApproval(ctx, &client.RequestApprovalRequest{
+			Operator:     signer.DID().String(),
 			OwnerAddress: testAddr.String(),
 			Signature:    signature.Raw(),
 		})
@@ -967,8 +967,8 @@ func TestSystemRequestContractApproval(t *testing.T) {
 		signature := signer.Sign(signer.DID().Bytes())
 
 		// Should succeed even if already approved (idempotent behavior)
-		err = c.RequestApproval(ctx, &client.RequestApproval{
-			DID:          signer.DID().String(),
+		err = c.RequestApproval(ctx, &client.RequestApprovalRequest{
+			Operator:     signer.DID().String(),
 			OwnerAddress: testAddr.String(),
 			Signature:    signature.Raw(),
 		})

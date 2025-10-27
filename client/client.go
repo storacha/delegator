@@ -34,13 +34,13 @@ func (c *Client) WithHTTPClient(httpClient *http.Client) *Client {
 	return c
 }
 
-type RequestApproval struct {
-	DID          string `json:"did"`
+type RequestApprovalRequest struct {
+	Operator     string `json:"operator"`
 	OwnerAddress string `json:"owner_address"`
 	Signature    []byte `json:"signature"`
 }
 
-func (c *Client) RequestApproval(ctx context.Context, req *RequestApproval) error {
+func (c *Client) RequestApproval(ctx context.Context, req *RequestApprovalRequest) error {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
@@ -72,7 +72,7 @@ func (c *Client) RequestApproval(ctx context.Context, req *RequestApproval) erro
 }
 
 type RegisterRequest struct {
-	DID           string `json:"did"`
+	Operator      string `json:"operator"`
 	OwnerAddress  string `json:"owner_address"`
 	ProofSetID    uint64 `json:"proof_set_id"`
 	OperatorEmail string `json:"operator_email"`

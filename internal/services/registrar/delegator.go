@@ -62,7 +62,7 @@ type Service struct {
 
 	uploadServiceDID did.DID
 
-	ContractOperator ContractOperator
+	contractOperator ContractOperator
 }
 
 type ServiceParams struct {
@@ -99,7 +99,7 @@ func New(p ServiceParams) *Service {
 		egressTrackingServiceDID:   p.EgressTrackingServiceDID,
 		egressTrackingServiceProof: p.EgressTrackingServiceProof,
 		uploadServiceDID:           p.UploadServiceDID,
-		ContractOperator:           p.ContractOperator,
+		contractOperator:           p.ContractOperator,
 	}
 }
 
@@ -383,7 +383,7 @@ type ContractOperator interface {
 // for a storage provider in the Storacha network.
 type RequestApprovalParams struct {
 	// DID is the decentralized identifier of the operator requesting approval
-	DID did.DID
+	Operator did.DID
 	// OwnerAddress is the Ethereum address of the provider owner on the blockchain
 	OwnerAddress common.Address
 	// Signature is the cryptographic signature of the DID signed with the DID's private key,
@@ -415,9 +415,9 @@ type RequestApprovalParams struct {
 //   - ErrInternal for unexpected errors (database failures, contract call failures, etc.)
 func (s *Service) RequestContractApproval(ctx context.Context, req RequestApprovalParams) error {
 	// first check if the DID is in the allow list
-	allowed, err := s.store.IsAllowedDID(ctx, req.DID)
+	allowed, err := s.store.IsAllowedDID(ctx, req.Operator)
 	if err != nil {
-		log.Errorw("failed to check if DID is allowed", "DID", req.DID, "error", err)
+		log.Errorw("failed to check if DID is allowed", "DID", req.Operator, "error", err)
 		return ErrInternal
 	}
 	if !allowed {
@@ -425,19 +425,19 @@ func (s *Service) RequestContractApproval(ctx context.Context, req RequestApprov
 	}
 
 	// next validate they own the DID they claim
-	v, err := verifier.Parse(req.DID.String())
+	v, err := verifier.Parse(req.Operator.String())
 	if err != nil {
 		return ErrInvalidDID
 	}
 	// providers sign their own DID with its private key, here we verify the signature.
-	if !v.Verify(req.DID.Bytes(), signature.NewSignature(signature.EdDSA, req.Signature)) {
+	if !v.Verify(req.Operator.Bytes(), signature.NewSignature(signature.EdDSA, req.Signature)) {
 		// logging since this may represent someone doing something nasty!
-		log.Errorw("failed to verify DID", "DID", req.DID, "signature", req.Signature)
+		log.Errorw("failed to verify DID", "DID", req.Operator, "signature", req.Signature)
 		return ErrInvalidSignature
 	}
 
 	// check if the provider is registered with the contract, they must have register to be approved.
-	registered, err := s.ContractOperator.IsRegisteredProvider(ctx, req.OwnerAddress)
+	registered, err := s.contractOperator.IsRegisteredProvider(ctx, req.OwnerAddress)
 	if err != nil {
 		log.Errorw("failed to check if provider is registered with contract", "address", req.OwnerAddress, "error", err)
 		return ErrInternal
@@ -447,7 +447,7 @@ func (s *Service) RequestContractApproval(ctx context.Context, req RequestApprov
 		return ErrContractProviderNotRegistered
 	}
 	// they are registered, check if they have already been approved.
-	providerInfo, err := s.ContractOperator.GetProviderByAddress(ctx, req.OwnerAddress)
+	providerInfo, err := s.contractOperator.GetProviderByAddress(ctx, req.OwnerAddress)
 	if err != nil {
 		// failure here is an internal error, so log it
 		log.Errorw("failed to get provider info", "error", err)
@@ -456,7 +456,7 @@ func (s *Service) RequestContractApproval(ctx context.Context, req RequestApprov
 	// contract approval calls are NOT idempotent, repeated calls to approve fail, so only approve if unapproved
 	if !providerInfo.IsApproved {
 		// approve the provider
-		res, err := s.ContractOperator.ApproveProvider(ctx, providerInfo.ID)
+		res, err := s.contractOperator.ApproveProvider(ctx, providerInfo.ID)
 		if err != nil {
 			// failure here is an internal error, so log it
 			log.Errorw("failed to approve provider", "error", err)

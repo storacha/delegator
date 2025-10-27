@@ -201,7 +201,7 @@ func (s *SmartContractOperator) ApproveProvider(ctx context.Context, id uint64) 
 	return s.o.ApproveProvider(ctx, id)
 }
 
-func ProviderContractOperator(cfg config.ContractOperatorConfig) (registrar.ContractOperator, error) {
+func ProvideContractOperator(cfg config.ContractOperatorConfig) (registrar.ContractOperator, error) {
 	in, err := inspector.New(inspector.Config{
 		ClientEndpoint:          cfg.ChainClientEndpoint,
 		PaymentsContractAddress: common.HexToAddress(cfg.PaymentsContractAddress),

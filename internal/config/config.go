@@ -8,7 +8,7 @@ import (
 	"go.uber.org/fx"
 )
 
-func SupplyConfig(cfg *Config) fx.Option {
+func SupplyConfigs(cfg *Config) fx.Option {
 	return fx.Supply(
 		cfg,
 		cfg.Server,
@@ -90,13 +90,13 @@ func NewConfig() (*Config, error) {
 	}
 
 	if !common.IsHexAddress(cfg.Contract.RegistryContractAddress) {
-		return nil, fmt.Errorf("registry contract address not set")
+		return nil, fmt.Errorf("registry contract address invalid")
 	}
 	if !common.IsHexAddress(cfg.Contract.PaymentsContractAddress) {
-		return nil, fmt.Errorf("payments contract address not set")
+		return nil, fmt.Errorf("payments contract address invalid")
 	}
 	if !common.IsHexAddress(cfg.Contract.ServiceContractAddress) {
-		return nil, fmt.Errorf("service contract address not set")
+		return nil, fmt.Errorf("service contract address invalid")
 	}
 	if cfg.Contract.ChainClientEndpoint == "" {
 		return nil, fmt.Errorf("chain client endpoint not set")

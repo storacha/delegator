@@ -25,7 +25,7 @@ var ServeCmd = &cobra.Command{
 		}
 		app := fx.New(
 			// Configuration
-			config.SupplyConfig(cfg),
+			config.SupplyConfigs(cfg),
 			fx.Provide(
 				// Providers for complex types
 				providers.ProvideSigner,
@@ -34,7 +34,7 @@ var ServeCmd = &cobra.Command{
 				providers.ProvideEgressTrackingServiceDID,
 				providers.ProvideEgressTrackingServiceProof,
 				providers.ProvideUploadServiceDID,
-				providers.ProviderContractOperator,
+				providers.ProvideContractOperator,
 
 				// Store
 				fx.Annotate(

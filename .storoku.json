@@ -1,0 +1,33 @@
+{
+  "app": "registrar",
+  "privateKeyEnvVar": "REGISTRAR_DELEGATOR_KEY",
+  "didEnvVar": "REGISTRAR_DELEGATOR_DID",
+  "port": 0,
+  "js": null,
+  "domainBase": "",
+  "cloudflare": true,
+  "createDB": false,
+  "caches": null,
+  "topics": null,
+  "queues": null,
+  "buckets": null,
+  "secrets": [
+    {
+      "name": "REGISTRAR_DELEGATOR_INDEXING_SERVICE_PROOF",
+      "variable": true
+    },
+    {
+      "name": "REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_PROOF",
+      "variable": true
+    },
+    {
+      "name": "REGISTRAR_CONTRACT_TRANSACTOR_KEY",
+      "variable": true
+    }
+  ],
+  "tables": null,
+  "networks": [
+    "warm"
+  ],
+  "writeToContainer": false
+}

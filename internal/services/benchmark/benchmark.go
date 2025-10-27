@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -170,7 +169,7 @@ func (s *Service) BenchmarkDownload(ctx context.Context, endpoint url.URL) (*Ben
 	}
 	defer downloadRes.Body.Close()
 	// we don't care about the data, but we need to read it all to simulate a full download
-	_, err = io.Copy(ioutil.Discard, downloadRes.Body)
+	_, err = io.Copy(io.Discard, downloadRes.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download body for benchmark download from %s for benchmark: %w", endpoint.String(), err)
 	}

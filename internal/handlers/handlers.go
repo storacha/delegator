@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -12,15 +14,19 @@ import (
 	"github.com/storacha/delegator/internal/services/registrar"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/principal"
+	"github.com/storacha/go-ucanto/principal/signer"
 )
 
 type Handlers struct {
+	id               principal.Signer
 	service          *registrar.Service
 	benchmarkService *benchmark.Service
 }
 
-func NewHandlers(svc *registrar.Service, benchmarkSvc *benchmark.Service) *Handlers {
+func NewHandlers(svcID principal.Signer, svc *registrar.Service, benchmarkSvc *benchmark.Service) *Handlers {
 	return &Handlers{
+		id:               svcID,
 		service:          svc,
 		benchmarkService: benchmarkSvc,
 	}
@@ -34,6 +40,50 @@ func (h *Handlers) HealthCheck(c echo.Context) error {
 
 func (h *Handlers) Root(c echo.Context) error {
 	return c.String(http.StatusOK, "hello")
+}
+
+// DIDDocumentResponse is a did document that describes a did subject.
+// See https://www.w3.org/TR/did-core/#dfn-did-documents.
+type DIDDocumentResponse struct {
+	Context            []string             `json:"@context"` // https://w3id.org/did/v1
+	ID                 string               `json:"id"`
+	Controller         []string             `json:"controller,omitempty"`
+	VerificationMethod []VerificationMethod `json:"verificationMethod,omitempty"`
+	Authentication     []string             `json:"authentication,omitempty"`
+	AssertionMethod    []string             `json:"assertionMethod,omitempty"`
+}
+
+// VerificationMethod describes how to authenticate or authorize interactions
+// with a did subject.
+// See https://www.w3.org/TR/did-core/#dfn-verification-method.
+type VerificationMethod struct {
+	ID                 string `json:"id,omitempty"`
+	Type               string `json:"type,omitempty"`
+	Controller         string `json:"controller,omitempty"`
+	PublicKeyMultibase string `json:"publicKeyMultibase,omitempty"`
+}
+
+func (h *Handlers) DIDDocument(c echo.Context) error {
+	doc := DIDDocumentResponse{
+		Context: []string{"https://w3id.org/did/v1"},
+		ID:      h.id.DID().String(),
+	}
+
+	if s, ok := h.id.(signer.WrappedSigner); ok {
+		vid := fmt.Sprintf("%s#owner", s.DID())
+		doc.VerificationMethod = []VerificationMethod{
+			{
+				ID:                 vid,
+				Type:               "Ed25519VerificationKey2020",
+				Controller:         s.DID().String(),
+				PublicKeyMultibase: strings.TrimPrefix(s.Unwrap().DID().String(), "did:key:"),
+			},
+		}
+		doc.Authentication = []string{vid}
+		doc.AssertionMethod = []string{vid}
+	}
+
+	return c.JSON(http.StatusOK, doc)
 }
 
 type RegisterRequest struct {

@@ -1,0 +1,75 @@
+# storoku:ignore
+
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches: [main]
+  workflow_run:
+    workflows: [Releaser]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+
+jobs:
+  # apply staging on pushes to main, plan otherwise
+  # staging:
+  #   uses: ./.github/workflows/terraform.yml
+  #   with:
+  #     env: staging
+  #     workspace: staging
+  #     did: did:web:staging.registrar.storacha.network
+  #     apply: ${{ github.event_name != 'pull_request' }}
+  #   secrets:
+  #     aws-account-id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
+  #     aws-region: ${{ secrets.STAGING_AWS_REGION }}
+  #     region: ${{ secrets.STAGING_AWS_REGION }}
+  #     private-key: ${{ secrets.STAGING_PRIVATE_KEY }}
+  #     indexing-service-proof: ${{ secrets.STAGING_INDEXING_SERVICE_PROOF }}
+  #     egress-tracking-service-proof: ${{ secrets.STAGING_EGRESS_TRACKING_SERVICE_PROOF }}
+  #     cloudflare-zone-id: ${{ secrets.STAGING_CLOUDFLARE_ZONE_ID }}
+  #     cloudflare-api-token: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+
+  warm-staging:
+    uses: ./.github/workflows/terraform.yml
+    with:
+      env: warm-staging
+      workspace: warm-staging
+      network: warm
+      did: did:web:staging.registrar.warm.storacha.network
+      apply: ${{ github.event_name != 'pull_request' }}
+    secrets:
+      aws-account-id: ${{ secrets.WARM_STAGING_AWS_ACCOUNT_ID }}
+      aws-region: ${{ secrets.WARM_STAGING_AWS_REGION }}
+      region: ${{ secrets.WARM_STAGING_AWS_REGION }}
+      private-key: ${{ secrets.WARM_STAGING_PRIVATE_KEY }}
+      indexing-service-proof: ${{ secrets.WARM_STAGING_INDEXING_SERVICE_PROOF }}
+      egress-tracking-service-proof: ${{ secrets.WARM_STAGING_EGRESS_TRACKING_SERVICE_PROOF }}
+      contract-transactor-key: ${{ secrets.WARM_STAGING_CONTRACT_TRANSACTOR_KEY }}
+      cloudflare-zone-id: ${{ secrets.WARM_STAGING_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.WARM_STAGING_CLOUDFLARE_API_TOKEN }}
+
+  # apply prod on successful release, plan otherwise
+  # production:
+  #   uses: ./.github/workflows/terraform.yml
+  #   with:
+  #     env: production
+  #     workspace: prod
+  #     did: did:web:registrar.storacha.network
+  #     apply: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
+  #   secrets:
+  #     aws-account-id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
+  #     aws-region: ${{ secrets.PROD_AWS_REGION }}
+  #     region: ${{ secrets.PROD_AWS_REGION }}
+  #     private-key: ${{ secrets.PROD_PRIVATE_KEY }}
+  #     indexing-service-proof: ${{ secrets.PROD_INDEXING_SERVICE_PROOF }}
+  #     egress-tracking-service-proof: ${{ secrets.PROD_EGRESS_TRACKING_SERVICE_PROOF }}
+  #     cloudflare-zone-id: ${{ secrets.PROD_CLOUDFLARE_ZONE_ID }}
+  #     cloudflare-api-token: ${{ secrets.PROD_CLOUDFLARE_API_TOKEN }}

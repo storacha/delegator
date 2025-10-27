@@ -34,7 +34,7 @@ Simple root endpoint for basic connectivity check.
 **Response:**
 - `200 OK` - Returns plain text "hello"
 
-#### `GET /health`
+#### `GET /healthcheck`
 Health check endpoint for monitoring service availability.
 
 **Response:**
@@ -261,16 +261,16 @@ delegator:
 ```
 
 ### Environment Variables
-All configuration values can be set via environment variables with the prefix `DELEGATOR_`:
+All configuration values can be set via environment variables with the prefix `REGISTRAR_`:
 ```bash
-export DELEGATOR_SERVER_PORT=9090
-export DELEGATOR_STORE_REGION=us-west-2
+export REGISTRAR_SERVER_PORT=9090
+export REGISTRAR_STORE_REGION=us-west-2
 ```
 
 ## Development
 
 ### Prerequisites
-- Go 1.24.4 or later
+- Go 1.25.3 or later
 - Access to DynamoDB (AWS or local)
 - Ed25519 private key for delegator identity
 
@@ -280,5 +280,5 @@ export DELEGATOR_STORE_REGION=us-west-2
 docker run -p 8000:8000 amazon/dynamodb-local -jar DynamoDBLocal.jar -sharedDb
 
 # Configure for local development
-export DELEGATOR_STORE_ENDPOINT=localhost:8000
+export REGISTRAR_STORE_ENDPOINT=localhost:8000
 ```

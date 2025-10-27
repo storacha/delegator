@@ -21,6 +21,7 @@ import (
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
+	"github.com/storacha/go-ucanto/principal/signer"
 	"go.uber.org/fx"
 
 	"github.com/storacha/delegator/internal/config"
@@ -37,7 +38,29 @@ type SignerResult struct {
 }
 
 func ProvideSigner(params SignerParams) (SignerResult, error) {
-	signer, err := signerFromEd25519PEMFile(params.Config.Delegator.KeyFile)
+	var s principal.Signer
+	var err error
+	switch {
+	case params.Config.Delegator.Key != "":
+		s, err = ed25519.Parse(params.Config.Delegator.Key)
+		if err != nil {
+			return SignerResult{}, fmt.Errorf("failed to parse multibase key: %w", err)
+		}
+	case params.Config.Delegator.KeyFile != "":
+		s, err = signerFromEd25519PEMFile(params.Config.Delegator.KeyFile)
+		if err != nil {
+			return SignerResult{}, fmt.Errorf("failed to parse key file: %w", err)
+		}
+	default:
+		return SignerResult{}, fmt.Errorf("no key or key file provided")
+	}
+
+	did, err := did.Parse(params.Config.Delegator.DID)
+	if err != nil {
+		return SignerResult{}, fmt.Errorf("failed to parse did: %w", err)
+	}
+
+	signer, err := signer.Wrap(s, did)
 	if err != nil {
 		return SignerResult{}, err
 	}
@@ -212,6 +235,7 @@ func ProvideContractOperator(cfg config.ContractOperatorConfig) (registrar.Contr
 		return nil, fmt.Errorf("failed to initialize contract inspector: %w", err)
 	}
 	txtr, err := chain.NewTransactor(big.NewInt(cfg.Transactor.ChainID), chain.TransactorConfig{
+		Key:              cfg.Transactor.Key,
 		KeystorePath:     cfg.Transactor.KeystorePath,
 		KeystorePassword: cfg.Transactor.KeystorePassword,
 	})

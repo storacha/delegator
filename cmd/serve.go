@@ -17,7 +17,7 @@ import (
 var ServeCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start the HTTP server",
-	Long:  `Start the delegator HTTP server with configured endpoints.`,
+	Long:  `Start the registrar HTTP server with configured endpoints.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.NewConfig()
 		if err != nil {
@@ -64,7 +64,6 @@ const (
 )
 
 func init() {
-
 	// Server flags
 	ServeCmd.Flags().String("host", "0.0.0.0", "Server host")
 	ServeCmd.Flags().Int("port", 8080, "Server port")
@@ -77,7 +76,10 @@ func init() {
 	ServeCmd.Flags().String("store-endpoint", "", "DynamoDB endpoint (for local testing)")
 
 	// Service flags
+	ServeCmd.Flags().String("delegator-key", "", "Multibase-encoded delegator private key")
 	ServeCmd.Flags().String("delegator-key-file", "", "Path to delegator private key file")
+	ServeCmd.Flags().String("delegator-did", "", "DID web of the delegator")
+
 	ServeCmd.Flags().String("delegator-indexing-service-did", "", "DID of the indexing service")
 	ServeCmd.Flags().String("delegator-indexing-service-proof", "", "Path to proof file from indexing service")
 	ServeCmd.Flags().String("delegator-egress-tracking-service-did", "", "DID of the egress tracking service")
@@ -90,6 +92,7 @@ func init() {
 	ServeCmd.Flags().String("contract-service-contract-address", "", "Ethereum address of the service contract")
 	ServeCmd.Flags().String("contract-registry-contract-address", "", "Ethereum address of the registry contract")
 	ServeCmd.Flags().Int64("contract-transactor-chain-id", FilecoinCalibrationNetworkChainID, "Chain ID for blockchain transactions")
+	ServeCmd.Flags().String("contract-transactor-key", "", "Ethereum private key for transaction signing")
 	ServeCmd.Flags().String("contract-transactor-keystore-path", "", "Path to Ethereum keystore file for transaction signing")
 	ServeCmd.Flags().String("contract-transactor-keystore-password", "", "Password for the Ethereum keystore file")
 
@@ -103,7 +106,9 @@ func init() {
 	cobra.CheckErr(viper.BindPFlag("store.providerweight", ServeCmd.Flags().Lookup("store-provider-weight")))
 	cobra.CheckErr(viper.BindPFlag("store.endpoint", ServeCmd.Flags().Lookup("store-endpoint")))
 
+	cobra.CheckErr(viper.BindPFlag("delegator.key", ServeCmd.Flags().Lookup("delegator-key")))
 	cobra.CheckErr(viper.BindPFlag("delegator.key_file", ServeCmd.Flags().Lookup("delegator-key-file")))
+	cobra.CheckErr(viper.BindPFlag("delegator.did", ServeCmd.Flags().Lookup("delegator-did")))
 	cobra.CheckErr(viper.BindPFlag("delegator.indexing_service_web_did", ServeCmd.Flags().Lookup("delegator-indexing-service-did")))
 	cobra.CheckErr(viper.BindPFlag("delegator.indexing_service_proof", ServeCmd.Flags().Lookup("delegator-indexing-service-proof")))
 	cobra.CheckErr(viper.BindPFlag("delegator.egress_tracking_service_did", ServeCmd.Flags().Lookup("delegator-egress-tracking-service-did")))
@@ -115,6 +120,7 @@ func init() {
 	cobra.CheckErr(viper.BindPFlag("contract.service_contract_address", ServeCmd.Flags().Lookup("contract-service-contract-address")))
 	cobra.CheckErr(viper.BindPFlag("contract.registry_contract_address", ServeCmd.Flags().Lookup("contract-registry-contract-address")))
 	cobra.CheckErr(viper.BindPFlag("contract.transactor.chain_id", ServeCmd.Flags().Lookup("contract-transactor-chain-id")))
+	cobra.CheckErr(viper.BindPFlag("contract.transactor.key", ServeCmd.Flags().Lookup("contract-transactor-key")))
 	cobra.CheckErr(viper.BindPFlag("contract.transactor.keystore_path", ServeCmd.Flags().Lookup("contract-transactor-keystore-path")))
 	cobra.CheckErr(viper.BindPFlag("contract.transactor.keystore_password", ServeCmd.Flags().Lookup("contract-transactor-keystore-password")))
 }

@@ -19,6 +19,10 @@
     {
       "name": "REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_PROOF",
       "variable": true
+    },
+    {
+      "name": "REGISTRAR_CONTRACT_TRANSACTOR_KEY",
+      "variable": true
     }
   ],
   "tables": null,

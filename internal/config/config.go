@@ -49,6 +49,7 @@ func NewConfig() (*Config, error) {
 			RegistryContractAddress: viper.GetString("contract.registry_contract_address"),
 			Transactor: ContractTransactorConfig{
 				ChainID:          viper.GetInt64("contract.transactor.chain_id"),
+				Key:              viper.GetString("contract.transactor.key"),
 				KeystorePath:     viper.GetString("contract.transactor.keystore_path"),
 				KeystorePassword: viper.GetString("contract.transactor.keystore_password"),
 			},
@@ -116,12 +117,17 @@ func NewConfig() (*Config, error) {
 	}
 	// decision on doing this will be made here: https://www.notion.so/storacha/Storacha-Forge-Contract-Billing-Operations-Design-Questions-28b5305b552480d08ea7c8a1ff077a2d?source=copy_link#28f5305b5524801e95e9f556ca7d8a9e
 	// TODO this is really insecure, we may want to import the aws secret manager sdk and use directly
-	if cfg.Contract.Transactor.KeystorePath == "" {
-		return nil, fmt.Errorf("transactor keystore path not set")
+	if cfg.Contract.Transactor.Key == "" {
+		if cfg.Contract.Transactor.KeystorePath == "" {
+			return nil, fmt.Errorf("either a transactor key or a keystore must be provided")
+		}
+		// TODO this is really insecure, we may want to import the aws secret manager sdk and use directly
+		if cfg.Contract.Transactor.KeystorePassword == "" {
+			return nil, fmt.Errorf("transactor keystore password not set")
+		}
 	}
-	// TODO this is really insecure, we may want to import the aws secret manager sdk and use directly
-	if cfg.Contract.Transactor.KeystorePassword == "" {
-		return nil, fmt.Errorf("transactor keystore password not set")
+	if cfg.Contract.Transactor.Key != "" && cfg.Contract.Transactor.KeystorePath != "" {
+		return nil, fmt.Errorf("both transactor key and keystore are set, only one can be provided")
 	}
 	return cfg, nil
 }
@@ -182,6 +188,7 @@ type ContractOperatorConfig struct {
 
 type ContractTransactorConfig struct {
 	ChainID          int64  `mapstructure:"chain_id"`
+	Key              string `mapstructure:"key"`
 	KeystorePath     string `mapstructure:"keystore_path"`
 	KeystorePassword string `mapstructure:"keystore_password"`
 }

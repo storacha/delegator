@@ -235,6 +235,7 @@ func ProvideContractOperator(cfg config.ContractOperatorConfig) (registrar.Contr
 		return nil, fmt.Errorf("failed to initialize contract inspector: %w", err)
 	}
 	txtr, err := chain.NewTransactor(big.NewInt(cfg.Transactor.ChainID), chain.TransactorConfig{
+		Key:              cfg.Transactor.Key,
 		KeystorePath:     cfg.Transactor.KeystorePath,
 		KeystorePassword: cfg.Transactor.KeystorePassword,
 	})

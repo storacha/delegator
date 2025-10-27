@@ -92,6 +92,7 @@ func init() {
 	ServeCmd.Flags().String("contract-service-contract-address", "", "Ethereum address of the service contract")
 	ServeCmd.Flags().String("contract-registry-contract-address", "", "Ethereum address of the registry contract")
 	ServeCmd.Flags().Int64("contract-transactor-chain-id", FilecoinCalibrationNetworkChainID, "Chain ID for blockchain transactions")
+	ServeCmd.Flags().String("contract-transactor-key", "", "Ethereum private key for transaction signing")
 	ServeCmd.Flags().String("contract-transactor-keystore-path", "", "Path to Ethereum keystore file for transaction signing")
 	ServeCmd.Flags().String("contract-transactor-keystore-password", "", "Password for the Ethereum keystore file")
 
@@ -119,6 +120,7 @@ func init() {
 	cobra.CheckErr(viper.BindPFlag("contract.service_contract_address", ServeCmd.Flags().Lookup("contract-service-contract-address")))
 	cobra.CheckErr(viper.BindPFlag("contract.registry_contract_address", ServeCmd.Flags().Lookup("contract-registry-contract-address")))
 	cobra.CheckErr(viper.BindPFlag("contract.transactor.chain_id", ServeCmd.Flags().Lookup("contract-transactor-chain-id")))
+	cobra.CheckErr(viper.BindPFlag("contract.transactor.key", ServeCmd.Flags().Lookup("contract-transactor-key")))
 	cobra.CheckErr(viper.BindPFlag("contract.transactor.keystore_path", ServeCmd.Flags().Lookup("contract-transactor-keystore-path")))
 	cobra.CheckErr(viper.BindPFlag("contract.transactor.keystore_password", ServeCmd.Flags().Lookup("contract-transactor-keystore-password")))
 }

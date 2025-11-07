@@ -19,24 +19,6 @@ permissions:
   contents: read # This is required for actions/checkout
 
 jobs:
-  # apply staging on pushes to main, plan otherwise
-  # staging:
-  #   uses: ./.github/workflows/terraform.yml
-  #   with:
-  #     env: staging
-  #     workspace: staging
-  #     did: did:web:staging.registrar.storacha.network
-  #     apply: ${{ github.event_name != 'pull_request' }}
-  #   secrets:
-  #     aws-account-id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
-  #     aws-region: ${{ secrets.STAGING_AWS_REGION }}
-  #     region: ${{ secrets.STAGING_AWS_REGION }}
-  #     private-key: ${{ secrets.STAGING_PRIVATE_KEY }}
-  #     indexing-service-proof: ${{ secrets.STAGING_INDEXING_SERVICE_PROOF }}
-  #     egress-tracking-service-proof: ${{ secrets.STAGING_EGRESS_TRACKING_SERVICE_PROOF }}
-  #     cloudflare-zone-id: ${{ secrets.STAGING_CLOUDFLARE_ZONE_ID }}
-  #     cloudflare-api-token: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
-
   warm-staging:
     uses: ./.github/workflows/terraform.yml
     with:
@@ -57,19 +39,21 @@ jobs:
       cloudflare-api-token: ${{ secrets.WARM_STAGING_CLOUDFLARE_API_TOKEN }}
 
   # apply prod on successful release, plan otherwise
-  # production:
-  #   uses: ./.github/workflows/terraform.yml
-  #   with:
-  #     env: production
-  #     workspace: prod
-  #     did: did:web:registrar.storacha.network
-  #     apply: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
-  #   secrets:
-  #     aws-account-id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
-  #     aws-region: ${{ secrets.PROD_AWS_REGION }}
-  #     region: ${{ secrets.PROD_AWS_REGION }}
-  #     private-key: ${{ secrets.PROD_PRIVATE_KEY }}
-  #     indexing-service-proof: ${{ secrets.PROD_INDEXING_SERVICE_PROOF }}
-  #     egress-tracking-service-proof: ${{ secrets.PROD_EGRESS_TRACKING_SERVICE_PROOF }}
-  #     cloudflare-zone-id: ${{ secrets.PROD_CLOUDFLARE_ZONE_ID }}
-  #     cloudflare-api-token: ${{ secrets.PROD_CLOUDFLARE_API_TOKEN }}
+  forge-production:
+    uses: ./.github/workflows/terraform.yml
+    with:
+      env: forge-production
+      workspace: forge-prod
+      network: forge
+      did: did:web:registrar.forge.storacha.network
+      apply: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
+    secrets:
+      aws-account-id: ${{ secrets.FORGE_PROD_AWS_ACCOUNT_ID }}
+      aws-region: ${{ secrets.FORGE_PROD_AWS_REGION }}
+      region: ${{ secrets.FORGE_PROD_AWS_REGION }}
+      private-key: ${{ secrets.FORGE_PROD_PRIVATE_KEY }}
+      indexing-service-proof: ${{ secrets.FORGE_PROD_INDEXING_SERVICE_PROOF }}
+      egress-tracking-service-proof: ${{ secrets.FORGE_PROD_EGRESS_TRACKING_SERVICE_PROOF }}
+      contract-transactor-key: ${{ secrets.FORGE_PROD_CONTRACT_TRANSACTOR_KEY }}
+      cloudflare-zone-id: ${{ secrets.FORGE_PROD_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.FORGE_PROD_CLOUDFLARE_API_TOKEN }}

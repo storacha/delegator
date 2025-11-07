@@ -27,7 +27,8 @@
   ],
   "tables": null,
   "networks": [
-    "warm"
+    "warm",
+    "forge"
   ],
   "writeToContainer": false
 }

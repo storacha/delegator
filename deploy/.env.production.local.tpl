@@ -1,13 +1,13 @@
 <%
-if [ "$TF_WORKSPACE" == "prod" ]; then
+if [ "$TF_WORKSPACE" == "forge-prod" ]; then
   REGISTRAR_STORE_REGION="us-west-2"
-  REGISTRAR_STORE_ALLOWLIST_TABLE_NAME="delegator-storage-provider-allow-list"
-  REGISTRAR_STORE_PROVIDERINFO_TABLE_NAME="upload-api-storage-provider"
+  REGISTRAR_STORE_ALLOWLIST_TABLE_NAME="forge-prod-registrar-storage-provider-allow-list"
+  REGISTRAR_STORE_PROVIDERINFO_TABLE_NAME="forge-prod-upload-api-storage-provider"
   REGISTRAR_STORE_PROVIDERWEIGHT=0
 
-  REGISTRAR_DELEGATOR_INDEXING_SERVICE_WEB_DID="did:web:indexer.storacha.network"
-  REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_DID="did:web:etracker.storacha.network"
-  REGISTRAR_DELEGATOR_UPLOAD_SERVICE_DID="did:web:up.storacha.network"
+  REGISTRAR_DELEGATOR_INDEXING_SERVICE_WEB_DID="did:web:indexer.forge.storacha.network"
+  REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_DID="did:web:etracker.forge.storacha.network"
+  REGISTRAR_DELEGATOR_UPLOAD_SERVICE_DID="did:web:up.forge.storacha.network"
 
   REGISTRAR_CONTRACT_CHAIN_CLIENT_ENDPOINT="https://api.node.glif.io/rpc/v1"
   REGISTRAR_CONTRACT_REGISTRY_CONTRACT_ADDRESS="0x8D0560F93022414e7787207682a8D562de02D62f"

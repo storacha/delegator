@@ -102,6 +102,8 @@ func init() {
 
 	cobra.CheckErr(viper.BindPFlag("store.region", ServeCmd.Flags().Lookup("store-region")))
 	cobra.CheckErr(viper.BindPFlag("store.allowlist_table_name", ServeCmd.Flags().Lookup("store-allowlist-table")))
+	// bind flag to storoku-style environment variable
+	cobra.CheckErr(viper.BindEnv("store.allowlist_table_name", "STORAGE_PROVIDER_ALLOW_LIST_TABLE_ID"))
 	cobra.CheckErr(viper.BindPFlag("store.providerinfo_table_name", ServeCmd.Flags().Lookup("store-providerinfo-table")))
 	cobra.CheckErr(viper.BindPFlag("store.providerweight", ServeCmd.Flags().Lookup("store-provider-weight")))
 	cobra.CheckErr(viper.BindPFlag("store.endpoint", ServeCmd.Flags().Lookup("store-endpoint")))

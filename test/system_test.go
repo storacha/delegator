@@ -362,6 +362,29 @@ func TestSystemHealthCheck(t *testing.T) {
 	}
 }
 
+func TestSystemDIDDocument(t *testing.T) {
+	mockStore := newMockStore()
+	app, serverURL, delegatorSigner, _, _, _, _ := setupTestServer(t, mockStore)
+	defer app.RequireStop()
+
+	// Create client
+	c, err := client.New(serverURL)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	// Test DID document endpoint
+	ctx := context.Background()
+	doc, err := c.DIDDocument(ctx)
+	if err != nil {
+		t.Fatalf("get did document failed: %v", err)
+	}
+
+	if doc.ID != delegatorSigner.DID().String() {
+		t.Fatalf("unexpected id: got %s, want %s", doc.ID, delegatorSigner.DID().String())
+	}
+}
+
 func TestSystemRegistrationFlow(t *testing.T) {
 	mockStore := newMockStore()
 	app, serverURL, _, _, _, uploadSigner, _ := setupTestServer(t, mockStore)
@@ -786,7 +809,7 @@ func TestSystemInvalidRequests(t *testing.T) {
 			name:     "deprecated method registrar/request-proof returns 410",
 			method:   "GET",
 			endpoint: "/registrar/request-proof",
-			body:     `{"invalid json`,
+			body:     `{"did": "did:key:z6MksvRCPWoXvMj8sUzuHiQ4pFkSawkKRz2eh1TALNEG6s3e"}`,
 			wantCode: http.StatusGone,
 		},
 	}

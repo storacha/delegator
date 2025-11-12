@@ -33,7 +33,9 @@ func NewConfig() (*Config, error) {
 			Endpoint:              viper.GetString("store.endpoint"),
 		},
 		Delegator: DelegatorServiceConfig{
+			Key:                        viper.GetString("delegator.key"),
 			KeyFile:                    viper.GetString("delegator.key_file"),
+			DID:                        viper.GetString("delegator.did"),
 			IndexingServiceWebDID:      viper.GetString("delegator.indexing_service_web_did"),
 			IndexingServiceProof:       viper.GetString("delegator.indexing_service_proof"),
 			EgressTrackingServiceDID:   viper.GetString("delegator.egress_tracking_service_did"),
@@ -47,6 +49,7 @@ func NewConfig() (*Config, error) {
 			RegistryContractAddress: viper.GetString("contract.registry_contract_address"),
 			Transactor: ContractTransactorConfig{
 				ChainID:          viper.GetInt64("contract.transactor.chain_id"),
+				Key:              viper.GetString("contract.transactor.key"),
 				KeystorePath:     viper.GetString("contract.transactor.keystore_path"),
 				KeystorePassword: viper.GetString("contract.transactor.keystore_password"),
 			},
@@ -70,23 +73,29 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("store provider info table not set")
 	}
 
-	if cfg.Delegator.KeyFile == "" {
-		return nil, fmt.Errorf("delegator key file not set")
+	if cfg.Delegator.Key == "" && cfg.Delegator.KeyFile == "" {
+		return nil, fmt.Errorf("either delegator key or key file must be set")
+	}
+	if cfg.Delegator.Key != "" && cfg.Delegator.KeyFile != "" {
+		return nil, fmt.Errorf("both delegator key and key file are set, please provide only one")
+	}
+	if cfg.Delegator.DID == "" {
+		return nil, fmt.Errorf("delegator DID not set")
 	}
 	if cfg.Delegator.IndexingServiceWebDID == "" {
-		return nil, fmt.Errorf("delegator indexing service did not set")
+		return nil, fmt.Errorf("delegator indexing service DID not set")
 	}
 	if cfg.Delegator.IndexingServiceProof == "" {
 		return nil, fmt.Errorf("delegator indexing service proof not set")
 	}
 	if cfg.Delegator.EgressTrackingServiceDID == "" {
-		return nil, fmt.Errorf("delegator egress tracking service did not set")
+		return nil, fmt.Errorf("delegator egress tracking service DID not set")
 	}
 	if cfg.Delegator.EgressTrackingServiceProof == "" {
 		return nil, fmt.Errorf("delegator egress tracking service proof not set")
 	}
 	if cfg.Delegator.UploadServiceDID == "" {
-		return nil, fmt.Errorf("delegator upload did not set")
+		return nil, fmt.Errorf("delegator upload service DID not set")
 	}
 
 	if !common.IsHexAddress(cfg.Contract.RegistryContractAddress) {
@@ -108,12 +117,17 @@ func NewConfig() (*Config, error) {
 	}
 	// decision on doing this will be made here: https://www.notion.so/storacha/Storacha-Forge-Contract-Billing-Operations-Design-Questions-28b5305b552480d08ea7c8a1ff077a2d?source=copy_link#28f5305b5524801e95e9f556ca7d8a9e
 	// TODO this is really insecure, we may want to import the aws secret manager sdk and use directly
-	if cfg.Contract.Transactor.KeystorePath == "" {
-		return nil, fmt.Errorf("transactor keystore path not set")
+	if cfg.Contract.Transactor.Key == "" {
+		if cfg.Contract.Transactor.KeystorePath == "" {
+			return nil, fmt.Errorf("either a transactor key or a keystore must be provided")
+		}
+		// TODO this is really insecure, we may want to import the aws secret manager sdk and use directly
+		if cfg.Contract.Transactor.KeystorePassword == "" {
+			return nil, fmt.Errorf("transactor keystore password not set")
+		}
 	}
-	// TODO this is really insecure, we may want to import the aws secret manager sdk and use directly
-	if cfg.Contract.Transactor.KeystorePassword == "" {
-		return nil, fmt.Errorf("transactor keystore password not set")
+	if cfg.Contract.Transactor.Key != "" && cfg.Contract.Transactor.KeystorePath != "" {
+		return nil, fmt.Errorf("both transactor key and keystore are set, only one can be provided")
 	}
 	return cfg, nil
 }
@@ -154,7 +168,9 @@ type DynamoConfig struct {
 }
 
 type DelegatorServiceConfig struct {
+	Key                        string `mapstructure:"key"`
 	KeyFile                    string `mapstructure:"key_file"`
+	DID                        string `mapstructure:"did"`
 	IndexingServiceWebDID      string `mapstructure:"indexing_service_web_did"`
 	IndexingServiceProof       string `mapstructure:"indexing_service_proof"`
 	EgressTrackingServiceDID   string `mapstructure:"egress_tracking_service_did"`
@@ -172,6 +188,7 @@ type ContractOperatorConfig struct {
 
 type ContractTransactorConfig struct {
 	ChainID          int64  `mapstructure:"chain_id"`
+	Key              string `mapstructure:"key"`
 	KeystorePath     string `mapstructure:"keystore_path"`
 	KeystorePassword string `mapstructure:"keystore_password"`
 }

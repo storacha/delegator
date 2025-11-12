@@ -36,8 +36,9 @@ func NewServer(cfg *config.Config, h *handlers.Handlers) *Server {
 }
 
 func (s *Server) setupRoutes() {
-	s.echo.GET("/health", s.handlers.HealthCheck)
+	s.echo.GET("/healthcheck", s.handlers.HealthCheck)
 	s.echo.GET("/", s.handlers.Root)
+	s.echo.GET("/.well-known/did.json", s.handlers.DIDDocument)
 	s.echo.PUT("/registrar/register-node", s.handlers.Register)
 	s.echo.POST("/registrar/request-approval", s.handlers.RequestContractApproval)
 	s.echo.GET("/registrar/request-proof", s.handlers.RequestProof) // TODO: deprecated, remove when nobody uses it

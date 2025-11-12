@@ -12,8 +12,8 @@ import (
 var cfgFile string
 
 var RootCmd = &cobra.Command{
-	Use:   "delegator",
-	Short: "Delegator HTTP server",
+	Use:   "registrar",
+	Short: "Registrar HTTP server",
 	Long:  `A simple HTTP server with health check, register, and request-proof endpoints.`,
 }
 
@@ -43,7 +43,7 @@ func initConfig() {
 	}
 
 	// Enable automatic environment variable binding
-	viper.SetEnvPrefix("DELEGATOR")
+	viper.SetEnvPrefix("REGISTRAR")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 

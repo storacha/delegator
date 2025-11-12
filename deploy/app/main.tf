@@ -69,6 +69,16 @@ module "app" {
   caches = []
   topics = []
   tables = [
+    {
+      name = "storage-provider-allow-list"
+      attributes = [
+        {
+          name = "did"
+          type = "S"
+        },
+      ]
+      hash_key = "did"
+    },
   ]
   buckets = [
   ]

@@ -25,9 +25,22 @@
       "variable": true
     }
   ],
-  "tables": null,
+  "tables": [
+    {
+      "name": "storage-provider-allow-list",
+      "attributes": [
+        {
+          "name": "did",
+          "type": "S"
+        }
+      ],
+      "hashKey": "did",
+      "rangeKey": ""
+    }
+  ],
   "networks": [
-    "warm"
+    "warm",
+    "forge"
   ],
   "writeToContainer": false
 }

@@ -15,7 +15,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.21.0
-	github.com/storacha/forgectl v0.0.0-20251027201253-0fc088ad13a9
+	github.com/storacha/forgectl v0.0.1
 	github.com/storacha/go-libstoracha v0.2.6
 	github.com/storacha/go-ucanto v0.5.0
 	go.uber.org/fx v1.23.0
@@ -110,7 +110,7 @@ require (
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
-	github.com/storacha/filecoin-services/go v0.0.1 // indirect
+	github.com/storacha/filecoin-services/go v0.0.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/supranational/blst v0.3.16-0.20250831170142-f48500c1fdbe // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect

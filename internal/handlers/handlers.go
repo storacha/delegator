@@ -143,6 +143,7 @@ func (h *Handlers) Register(c echo.Context) error {
 			status = http.StatusInternalServerError
 			message = err.Error()
 		}
+		log.Error("failed to register", "operator", operator, "error", err)
 		return c.JSON(status, map[string]string{
 			"error": message,
 		})

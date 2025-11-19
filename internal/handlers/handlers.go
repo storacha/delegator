@@ -98,20 +98,20 @@ type RegisterRequest struct {
 func (h *Handlers) Register(c echo.Context) error {
 	var req RegisterRequest
 	if err := c.Bind(&req); err != nil {
-		return c.String(http.StatusBadRequest, "invalid request body")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 	}
 
 	// parse and validate request
 	operator, err := did.Parse(req.Operator)
 	if err != nil {
-		return c.String(http.StatusBadRequest, "invalid DID")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid DID"})
 	}
 	if !common.IsHexAddress(req.OwnerAddress) {
-		return c.String(http.StatusBadRequest, "invalid OwnerAddress")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid owner address"})
 	}
 	endpoint, err := url.Parse(req.PublicURL)
 	if err != nil {
-		return c.String(http.StatusBadRequest, "invalid PublicURL")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid public URL"})
 	}
 
 	if err := h.service.Register(c.Request().Context(), registrar.RegisterParams{
@@ -122,24 +122,30 @@ func (h *Handlers) Register(c echo.Context) error {
 		PublicURL:     *endpoint,
 		Proof:         req.Proof,
 	}); err != nil {
-		if errors.Is(err, registrar.ErrContractProviderNotRegistered) {
-			return c.String(http.StatusUnprocessableEntity, "Provider not registered with smart-contract, must register first")
+		var status int
+		var message string
+		switch {
+		case errors.Is(err, registrar.ErrContractProviderNotRegistered):
+			status = http.StatusUnprocessableEntity
+			message = "provider not registered with smart-contract, must register first"
+		case errors.Is(err, registrar.ErrDIDNotAllowed):
+			status = http.StatusForbidden
+			message = "DID not allowed to register, contact Storacha team for help registering"
+		case errors.Is(err, registrar.ErrDIDAlreadyRegistered):
+			status = http.StatusConflict
+			message = "DID already registered"
+		case errors.Is(err, registrar.ErrBadEndpoint):
+			status = http.StatusBadRequest
+			message = "invalid public URL"
+		case errors.Is(err, registrar.ErrInvalidProof):
+			status = http.StatusBadRequest
+			message = "invalid proof"
+		default:
+			status = http.StatusInternalServerError
+			message = err.Error()
 		}
-		if errors.Is(err, registrar.ErrDIDNotAllowed) {
-			return c.String(http.StatusForbidden, "DID not allowed to register, contact Storacha team for help registering")
-		}
-		if errors.Is(err, registrar.ErrDIDAlreadyRegistered) {
-			return c.String(http.StatusConflict, "DID already registered")
-		}
-		if errors.Is(err, registrar.ErrBadEndpoint) {
-			return c.String(http.StatusBadRequest, "invalid PublicURL")
-		}
-		if errors.Is(err, registrar.ErrInvalidProof) {
-			return c.String(http.StatusBadRequest, "invalid Proof")
-		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
-		})
+		log.Error("failed to register", "operator", operator, "error", err)
+		return c.JSON(status, map[string]string{"error": message})
 	}
 
 	return c.NoContent(http.StatusCreated)
@@ -165,12 +171,12 @@ type Proofs struct {
 func (h *Handlers) RequestProofs(c echo.Context) error {
 	var req RequestProofsRequest
 	if err := c.Bind(&req); err != nil {
-		return c.String(http.StatusBadRequest, "invalid request body")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 	}
 
 	operator, err := did.Parse(req.DID)
 	if err != nil {
-		return c.String(http.StatusBadRequest, "invalid DID")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid DID"})
 	}
 
 	indexerProof, egressTrackerProof, err := h.service.RequestProofs(c.Request().Context(), operator)
@@ -188,12 +194,16 @@ func (h *Handlers) RequestProofs(c echo.Context) error {
 
 	indexerProofStr, err := delegation.Format(indexerProof)
 	if err != nil {
-		return c.String(http.StatusInternalServerError, "failed to read generated indexer proof")
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "failed to read generated indexer proof",
+		})
 	}
 
 	egressTrackerProofStr, err := delegation.Format(egressTrackerProof)
 	if err != nil {
-		return c.String(http.StatusInternalServerError, "failed to read generated egress tracker proof")
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "failed to read generated egress tracker proof",
+		})
 	}
 
 	return c.JSON(http.StatusOK, RequestProofsResponse{Proofs: Proofs{
@@ -209,12 +219,12 @@ type IsRegisteredRequest struct {
 func (h *Handlers) IsRegistered(c echo.Context) error {
 	var req IsRegisteredRequest
 	if err := c.Bind(&req); err != nil {
-		return c.String(http.StatusBadRequest, "invalid request body")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 	}
 
 	operator, err := did.Parse(req.DID)
 	if err != nil {
-		return c.String(http.StatusBadRequest, "invalid DID")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid DID"})
 	}
 
 	registered, err := h.service.IsRegisteredDID(c.Request().Context(), operator)

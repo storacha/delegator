@@ -104,14 +104,14 @@ func (h *Handlers) Register(c echo.Context) error {
 	// parse and validate request
 	operator, err := did.Parse(req.Operator)
 	if err != nil {
-		return c.String(http.StatusBadRequest, "invalid DID")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid DID"})
 	}
 	if !common.IsHexAddress(req.OwnerAddress) {
-		return c.String(http.StatusBadRequest, "invalid OwnerAddress")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid OwnerAddress"})
 	}
 	endpoint, err := url.Parse(req.PublicURL)
 	if err != nil {
-		return c.String(http.StatusBadRequest, "invalid PublicURL")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid PublicURL"})
 	}
 
 	if err := h.service.Register(c.Request().Context(), registrar.RegisterParams{
@@ -144,9 +144,7 @@ func (h *Handlers) Register(c echo.Context) error {
 			message = err.Error()
 		}
 		log.Error("failed to register", "operator", operator, "error", err)
-		return c.JSON(status, map[string]string{
-			"error": message,
-		})
+		return c.JSON(status, map[string]string{"error": message})
 	}
 
 	return c.NoContent(http.StatusCreated)

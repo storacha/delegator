@@ -98,7 +98,7 @@ type RegisterRequest struct {
 func (h *Handlers) Register(c echo.Context) error {
 	var req RegisterRequest
 	if err := c.Bind(&req); err != nil {
-		return c.String(http.StatusBadRequest, "invalid request body")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 	}
 
 	// parse and validate request
@@ -107,11 +107,11 @@ func (h *Handlers) Register(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid DID"})
 	}
 	if !common.IsHexAddress(req.OwnerAddress) {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid OwnerAddress"})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid owner address"})
 	}
 	endpoint, err := url.Parse(req.PublicURL)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid PublicURL"})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid public URL"})
 	}
 
 	if err := h.service.Register(c.Request().Context(), registrar.RegisterParams{
@@ -124,22 +124,23 @@ func (h *Handlers) Register(c echo.Context) error {
 	}); err != nil {
 		var status int
 		var message string
-		if errors.Is(err, registrar.ErrContractProviderNotRegistered) {
+		switch {
+		case errors.Is(err, registrar.ErrContractProviderNotRegistered):
 			status = http.StatusUnprocessableEntity
-			message = "Provider not registered with smart-contract, must register first"
-		} else if errors.Is(err, registrar.ErrDIDNotAllowed) {
+			message = "provider not registered with smart-contract, must register first"
+		case errors.Is(err, registrar.ErrDIDNotAllowed):
 			status = http.StatusForbidden
 			message = "DID not allowed to register, contact Storacha team for help registering"
-		} else if errors.Is(err, registrar.ErrDIDAlreadyRegistered) {
+		case errors.Is(err, registrar.ErrDIDAlreadyRegistered):
 			status = http.StatusConflict
 			message = "DID already registered"
-		} else if errors.Is(err, registrar.ErrBadEndpoint) {
+		case errors.Is(err, registrar.ErrBadEndpoint):
 			status = http.StatusBadRequest
-			message = "invalid PublicURL"
-		} else if errors.Is(err, registrar.ErrInvalidProof) {
+			message = "invalid public URL"
+		case errors.Is(err, registrar.ErrInvalidProof):
 			status = http.StatusBadRequest
-			message = "invalid Proof"
-		} else {
+			message = "invalid proof"
+		default:
 			status = http.StatusInternalServerError
 			message = err.Error()
 		}
@@ -170,12 +171,12 @@ type Proofs struct {
 func (h *Handlers) RequestProofs(c echo.Context) error {
 	var req RequestProofsRequest
 	if err := c.Bind(&req); err != nil {
-		return c.String(http.StatusBadRequest, "invalid request body")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 	}
 
 	operator, err := did.Parse(req.DID)
 	if err != nil {
-		return c.String(http.StatusBadRequest, "invalid DID")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid DID"})
 	}
 
 	indexerProof, egressTrackerProof, err := h.service.RequestProofs(c.Request().Context(), operator)
@@ -193,12 +194,16 @@ func (h *Handlers) RequestProofs(c echo.Context) error {
 
 	indexerProofStr, err := delegation.Format(indexerProof)
 	if err != nil {
-		return c.String(http.StatusInternalServerError, "failed to read generated indexer proof")
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "failed to read generated indexer proof",
+		})
 	}
 
 	egressTrackerProofStr, err := delegation.Format(egressTrackerProof)
 	if err != nil {
-		return c.String(http.StatusInternalServerError, "failed to read generated egress tracker proof")
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "failed to read generated egress tracker proof",
+		})
 	}
 
 	return c.JSON(http.StatusOK, RequestProofsResponse{Proofs: Proofs{
@@ -214,12 +219,12 @@ type IsRegisteredRequest struct {
 func (h *Handlers) IsRegistered(c echo.Context) error {
 	var req IsRegisteredRequest
 	if err := c.Bind(&req); err != nil {
-		return c.String(http.StatusBadRequest, "invalid request body")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 	}
 
 	operator, err := did.Parse(req.DID)
 	if err != nil {
-		return c.String(http.StatusBadRequest, "invalid DID")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid DID"})
 	}
 
 	registered, err := h.service.IsRegisteredDID(c.Request().Context(), operator)

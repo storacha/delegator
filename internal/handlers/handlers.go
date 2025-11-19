@@ -122,23 +122,29 @@ func (h *Handlers) Register(c echo.Context) error {
 		PublicURL:     *endpoint,
 		Proof:         req.Proof,
 	}); err != nil {
+		var status int
+		var message string
 		if errors.Is(err, registrar.ErrContractProviderNotRegistered) {
-			return c.String(http.StatusUnprocessableEntity, "Provider not registered with smart-contract, must register first")
+			status = http.StatusUnprocessableEntity
+			message = "Provider not registered with smart-contract, must register first"
+		} else if errors.Is(err, registrar.ErrDIDNotAllowed) {
+			status = http.StatusForbidden
+			message = "DID not allowed to register, contact Storacha team for help registering"
+		} else if errors.Is(err, registrar.ErrDIDAlreadyRegistered) {
+			status = http.StatusConflict
+			message = "DID already registered"
+		} else if errors.Is(err, registrar.ErrBadEndpoint) {
+			status = http.StatusBadRequest
+			message = "invalid PublicURL"
+		} else if errors.Is(err, registrar.ErrInvalidProof) {
+			status = http.StatusBadRequest
+			message = "invalid Proof"
+		} else {
+			status = http.StatusInternalServerError
+			message = err.Error()
 		}
-		if errors.Is(err, registrar.ErrDIDNotAllowed) {
-			return c.String(http.StatusForbidden, "DID not allowed to register, contact Storacha team for help registering")
-		}
-		if errors.Is(err, registrar.ErrDIDAlreadyRegistered) {
-			return c.String(http.StatusConflict, "DID already registered")
-		}
-		if errors.Is(err, registrar.ErrBadEndpoint) {
-			return c.String(http.StatusBadRequest, "invalid PublicURL")
-		}
-		if errors.Is(err, registrar.ErrInvalidProof) {
-			return c.String(http.StatusBadRequest, "invalid Proof")
-		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+		return c.JSON(status, map[string]string{
+			"error": message,
 		})
 	}
 

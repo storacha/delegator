@@ -40,7 +40,7 @@ provider "aws" {
 
 
 module "app" {
-  source = "github.com/storacha/storoku//app?ref=v0.5.0"
+  source = "github.com/storacha/storoku//app?ref=v0.5.2"
   private_key = var.private_key
   private_key_env_var = "REGISTRAR_DELEGATOR_KEY"
   principal_mapping = var.principal_mapping
@@ -62,8 +62,9 @@ module "app" {
   secrets = { 
     "REGISTRAR_DELEGATOR_INDEXING_SERVICE_PROOF" = var.indexing_service_proof
     "REGISTRAR_DELEGATOR_EGRESS_TRACKING_SERVICE_PROOF" = var.egress_tracking_service_proof
-    "REGISTRAR_CONTRACT_TRANSACTOR_KEY" = var.contract_transactor_key
   }
+  # enter external secrets (provisioned out-of-band) here
+  external_secrets = ["REGISTRAR_CONTRACT_TRANSACTOR_KEY",]
   # enter any sqs queues you want to create here
   queues = []
   caches = []

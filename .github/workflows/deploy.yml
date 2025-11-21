@@ -41,7 +41,6 @@ jobs:
       private-key: ${{ secrets.WARM_STAGING_PRIVATE_KEY }}
       indexing-service-proof: ${{ secrets.WARM_STAGING_INDEXING_SERVICE_PROOF }}
       egress-tracking-service-proof: ${{ secrets.WARM_STAGING_EGRESS_TRACKING_SERVICE_PROOF }}
-      contract-transactor-key: ${{ secrets.WARM_STAGING_CONTRACT_TRANSACTOR_KEY }}
       cloudflare-zone-id: ${{ secrets.WARM_STAGING_CLOUDFLARE_ZONE_ID }}
       cloudflare-api-token: ${{ secrets.WARM_STAGING_CLOUDFLARE_API_TOKEN }}
 
@@ -61,6 +60,5 @@ jobs:
       private-key: ${{ secrets.FORGE_PROD_PRIVATE_KEY }}
       indexing-service-proof: ${{ secrets.FORGE_PROD_INDEXING_SERVICE_PROOF }}
       egress-tracking-service-proof: ${{ secrets.FORGE_PROD_EGRESS_TRACKING_SERVICE_PROOF }}
-      contract-transactor-key: ${{ secrets.FORGE_PROD_CONTRACT_TRANSACTOR_KEY }}
       cloudflare-zone-id: ${{ secrets.FORGE_PROD_CLOUDFLARE_ZONE_ID }}
       cloudflare-api-token: ${{ secrets.FORGE_PROD_CLOUDFLARE_API_TOKEN }}

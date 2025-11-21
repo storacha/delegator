@@ -34,8 +34,6 @@ on:
         required: true
       egress-tracking-service-proof:
         required: true
-      contract-transactor-key:
-        required: true
       cloudflare-zone-id:
         required: true
       cloudflare-api-token:
@@ -59,7 +57,6 @@ env:
   TF_VAR_region: ${{ secrets.region }}
   TF_VAR_indexing_service_proof: ${{ secrets.indexing-service-proof }}
   TF_VAR_egress_tracking_service_proof: ${{ secrets.egress-tracking-service-proof }}
-  TF_VAR_contract_transactor_key: ${{ secrets.contract-transactor-key }}
   TF_VAR_cloudflare_zone_id: ${{ secrets.cloudflare-zone-id }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.cloudflare-api-token }}
   DEPLOY_ENV: ci

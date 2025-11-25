@@ -60,8 +60,3 @@ variable "egress_tracking_service_proof" {
   description = "value for registrar_delegator_egress_tracking_service_proof secret"
   type = string
 }
-
-variable "contract_transactor_key" {
-  description = "value for registrar_contract_transactor_key secret"
-  type = string
-}

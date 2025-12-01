@@ -2,7 +2,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 5.86.0"
+      version = ">= 6.0.0"
     }
     archive = {
       source = "hashicorp/archive"
@@ -31,16 +31,10 @@ provider "aws" {
   }
 }
 
-# CloudFront is a global service. Certs must be created in us-east-1, where the core ACM infra lives
-provider "aws" {
-  region = "us-east-1"
-  alias = "acm"
-}
-
 
 
 module "app" {
-  source = "github.com/storacha/storoku//app?ref=v0.5.2"
+  source = "github.com/storacha/storoku//app?ref=v0.6.1"
   private_key = var.private_key
   private_key_env_var = "REGISTRAR_DELEGATOR_KEY"
   principal_mapping = var.principal_mapping
@@ -83,10 +77,6 @@ module "app" {
   ]
   buckets = [
   ]
-  providers = {
-    aws = aws
-    aws.acm = aws.acm
-  }
   env_files = var.env_files
   domain_base = var.domain_base
 }

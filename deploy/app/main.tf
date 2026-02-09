@@ -34,7 +34,7 @@ provider "aws" {
 
 
 module "app" {
-  source = "github.com/storacha/storoku//app?ref=v0.6.1"
+  source = "github.com/storacha/storoku//app?ref=v0.6.1_co"
   private_key = var.private_key
   private_key_env_var = "REGISTRAR_DELEGATOR_KEY"
   principal_mapping = var.principal_mapping

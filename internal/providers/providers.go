@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -163,7 +164,20 @@ type IndexingServiceProofResult struct {
 }
 
 func ProvideIndexingServiceProof(params IndexingServiceProofParams) (IndexingServiceProofResult, error) {
-	proof, err := delegation.Parse(params.Config.Delegator.IndexingServiceProof)
+	var proofStr string
+
+	// Prefer proof file over inline proof string
+	if params.Config.Delegator.IndexingServiceProofFile != "" {
+		data, err := os.ReadFile(params.Config.Delegator.IndexingServiceProofFile)
+		if err != nil {
+			return IndexingServiceProofResult{}, fmt.Errorf("failed to read indexing service proof file: %w", err)
+		}
+		proofStr = strings.TrimSpace(string(data))
+	} else {
+		proofStr = params.Config.Delegator.IndexingServiceProof
+	}
+
+	proof, err := delegation.Parse(proofStr)
 	if err != nil {
 		return IndexingServiceProofResult{}, fmt.Errorf("failed to parse indexing service proof: %w", err)
 	}
@@ -201,7 +215,20 @@ type EgressTrackingServiceProofResult struct {
 }
 
 func ProvideEgressTrackingServiceProof(params EgressTrackingServiceProofParams) (EgressTrackingServiceProofResult, error) {
-	proof, err := delegation.Parse(params.Config.Delegator.EgressTrackingServiceProof)
+	var proofStr string
+
+	// Prefer proof file over inline proof string
+	if params.Config.Delegator.EgressTrackingServiceProofFile != "" {
+		data, err := os.ReadFile(params.Config.Delegator.EgressTrackingServiceProofFile)
+		if err != nil {
+			return EgressTrackingServiceProofResult{}, fmt.Errorf("failed to read egress tracking service proof file: %w", err)
+		}
+		proofStr = strings.TrimSpace(string(data))
+	} else {
+		proofStr = params.Config.Delegator.EgressTrackingServiceProof
+	}
+
+	proof, err := delegation.Parse(proofStr)
 	if err != nil {
 		return EgressTrackingServiceProofResult{}, fmt.Errorf("failed to parse egress tracking service proof: %w", err)
 	}

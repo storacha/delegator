@@ -33,14 +33,16 @@ func NewConfig() (*Config, error) {
 			Endpoint:              viper.GetString("store.endpoint"),
 		},
 		Delegator: DelegatorServiceConfig{
-			Key:                        viper.GetString("delegator.key"),
-			KeyFile:                    viper.GetString("delegator.key_file"),
-			DID:                        viper.GetString("delegator.did"),
-			IndexingServiceWebDID:      viper.GetString("delegator.indexing_service_web_did"),
-			IndexingServiceProof:       viper.GetString("delegator.indexing_service_proof"),
-			EgressTrackingServiceDID:   viper.GetString("delegator.egress_tracking_service_did"),
-			EgressTrackingServiceProof: viper.GetString("delegator.egress_tracking_service_proof"),
-			UploadServiceDID:           viper.GetString("delegator.upload_service_did"),
+			Key:                            viper.GetString("delegator.key"),
+			KeyFile:                        viper.GetString("delegator.key_file"),
+			DID:                            viper.GetString("delegator.did"),
+			IndexingServiceWebDID:          viper.GetString("delegator.indexing_service_web_did"),
+			IndexingServiceProof:           viper.GetString("delegator.indexing_service_proof"),
+			IndexingServiceProofFile:       viper.GetString("delegator.indexing_service_proof_file"),
+			EgressTrackingServiceDID:       viper.GetString("delegator.egress_tracking_service_did"),
+			EgressTrackingServiceProof:     viper.GetString("delegator.egress_tracking_service_proof"),
+			EgressTrackingServiceProofFile: viper.GetString("delegator.egress_tracking_service_proof_file"),
+			UploadServiceDID:               viper.GetString("delegator.upload_service_did"),
 		},
 		Contract: ContractOperatorConfig{
 			ChainClientEndpoint:     viper.GetString("contract.chain_client_endpoint"),
@@ -85,14 +87,14 @@ func NewConfig() (*Config, error) {
 	if cfg.Delegator.IndexingServiceWebDID == "" {
 		return nil, fmt.Errorf("delegator indexing service DID not set")
 	}
-	if cfg.Delegator.IndexingServiceProof == "" {
-		return nil, fmt.Errorf("delegator indexing service proof not set")
+	if cfg.Delegator.IndexingServiceProof == "" && cfg.Delegator.IndexingServiceProofFile == "" {
+		return nil, fmt.Errorf("delegator indexing service proof not set (set either indexing_service_proof or indexing_service_proof_file)")
 	}
 	if cfg.Delegator.EgressTrackingServiceDID == "" {
 		return nil, fmt.Errorf("delegator egress tracking service DID not set")
 	}
-	if cfg.Delegator.EgressTrackingServiceProof == "" {
-		return nil, fmt.Errorf("delegator egress tracking service proof not set")
+	if cfg.Delegator.EgressTrackingServiceProof == "" && cfg.Delegator.EgressTrackingServiceProofFile == "" {
+		return nil, fmt.Errorf("delegator egress tracking service proof not set (set either egress_tracking_service_proof or egress_tracking_service_proof_file)")
 	}
 	if cfg.Delegator.UploadServiceDID == "" {
 		return nil, fmt.Errorf("delegator upload service DID not set")
@@ -168,14 +170,16 @@ type DynamoConfig struct {
 }
 
 type DelegatorServiceConfig struct {
-	Key                        string `mapstructure:"key"`
-	KeyFile                    string `mapstructure:"key_file"`
-	DID                        string `mapstructure:"did"`
-	IndexingServiceWebDID      string `mapstructure:"indexing_service_web_did"`
-	IndexingServiceProof       string `mapstructure:"indexing_service_proof"`
-	EgressTrackingServiceDID   string `mapstructure:"egress_tracking_service_did"`
-	EgressTrackingServiceProof string `mapstructure:"egress_tracking_service_proof"`
-	UploadServiceDID           string `mapstructure:"upload_service_did"`
+	Key                            string `mapstructure:"key"`
+	KeyFile                        string `mapstructure:"key_file"`
+	DID                            string `mapstructure:"did"`
+	IndexingServiceWebDID          string `mapstructure:"indexing_service_web_did"`
+	IndexingServiceProof           string `mapstructure:"indexing_service_proof"`
+	IndexingServiceProofFile       string `mapstructure:"indexing_service_proof_file"`
+	EgressTrackingServiceDID       string `mapstructure:"egress_tracking_service_did"`
+	EgressTrackingServiceProof     string `mapstructure:"egress_tracking_service_proof"`
+	EgressTrackingServiceProofFile string `mapstructure:"egress_tracking_service_proof_file"`
+	UploadServiceDID               string `mapstructure:"upload_service_did"`
 }
 
 type ContractOperatorConfig struct {

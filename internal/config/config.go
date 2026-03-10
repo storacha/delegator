@@ -90,11 +90,17 @@ func NewConfig() (*Config, error) {
 	if cfg.Delegator.IndexingServiceProof == "" && cfg.Delegator.IndexingServiceProofFile == "" {
 		return nil, fmt.Errorf("delegator indexing service proof not set (set either indexing_service_proof or indexing_service_proof_file)")
 	}
+	if cfg.Delegator.IndexingServiceProof != "" && cfg.Delegator.IndexingServiceProofFile != "" {
+		return nil, fmt.Errorf("both delegator indexing service proof and proof file are set, please provide only one")
+	}
 	if cfg.Delegator.EgressTrackingServiceDID == "" {
 		return nil, fmt.Errorf("delegator egress tracking service DID not set")
 	}
 	if cfg.Delegator.EgressTrackingServiceProof == "" && cfg.Delegator.EgressTrackingServiceProofFile == "" {
 		return nil, fmt.Errorf("delegator egress tracking service proof not set (set either egress_tracking_service_proof or egress_tracking_service_proof_file)")
+	}
+	if cfg.Delegator.EgressTrackingServiceProof != "" && cfg.Delegator.EgressTrackingServiceProofFile != "" {
+		return nil, fmt.Errorf("both delegator egress tracking service proof and proof file are set, please provide only one")
 	}
 	if cfg.Delegator.UploadServiceDID == "" {
 		return nil, fmt.Errorf("delegator upload service DID not set")

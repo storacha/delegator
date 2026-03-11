@@ -1,16 +1,30 @@
-FROM golang:1.25-bookworm AS build
+# Build stage - use native platform for faster cross-compilation
+FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS build
 
-WORKDIR /registrar
+ARG TARGETOS=linux
+ARG TARGETARCH
 
-COPY go.* .
+WORKDIR /src
+
+# Copy dependency files first for better layer caching
+COPY go.mod go.sum ./
 RUN go mod download
+
+# Copy source code
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-w -s" -o registrar github.com/storacha/delegator
+# Build with cross-compilation and stripped binary
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags="-s -w" -o /app github.com/storacha/delegator
 
-FROM scratch
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=build /registrar/registrar /usr/bin/
+FROM alpine:latest AS prod
+
+# Create non-root user
+RUN adduser -D -H appuser
+USER appuser
+
+# Copy binary from build stage
+COPY --from=build /app /usr/bin/registrar
 
 EXPOSE 8080
 

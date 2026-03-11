@@ -7,6 +7,30 @@ deploy/Makefile
 deploy/.tfworkspace
 deploy/app
 deploy/shared
+
+# Git/CI
 .github
 .git
 .gitignore
+
+# Documentation
+*.md
+LICENSE
+
+# Docker tooling
+docker-compose*.yml
+
+# Environment files
+.env*
+
+# IDE/Editor
+.idea
+.vscode
+*.swp
+
+# Build artifacts
+bin/
+
+# Config (service uses env vars)
+*.yaml
+*.yml

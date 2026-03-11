@@ -19,9 +19,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
 
 FROM alpine:latest AS prod
 
-# Create non-root user
-RUN adduser -D -H appuser
-USER appuser
+USER nobody
 
 # Copy binary from build stage
 COPY --from=build /app /usr/bin/registrar

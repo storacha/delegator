@@ -20,6 +20,7 @@ on:
         options:
           - warm-staging
           - forge-production
+          - forge-test
 
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -70,7 +71,7 @@ jobs:
       workspace: forge-test
       network: test
       did: did:web:registrar.test.storacha.network
-      apply: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'forge-production') }}
+      apply: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'forge-test') }}
     secrets:
       aws-account-id: ${{ secrets.FORGE_TEST_AWS_ACCOUNT_ID }}
       aws-region: ${{ secrets.FORGE_TEST_AWS_REGION }}

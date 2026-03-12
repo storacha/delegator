@@ -44,7 +44,7 @@ jobs:
       cloudflare-zone-id: ${{ secrets.WARM_STAGING_CLOUDFLARE_ZONE_ID }}
       cloudflare-api-token: ${{ secrets.WARM_STAGING_CLOUDFLARE_API_TOKEN }}
 
-  # apply prod on successful release, plan otherwise
+  # apply prod and test on successful release, plan otherwise
   forge-production:
     uses: ./.github/workflows/terraform.yml
     with:
@@ -62,3 +62,21 @@ jobs:
       egress-tracking-service-proof: ${{ secrets.FORGE_PROD_EGRESS_TRACKING_SERVICE_PROOF }}
       cloudflare-zone-id: ${{ secrets.FORGE_PROD_CLOUDFLARE_ZONE_ID }}
       cloudflare-api-token: ${{ secrets.FORGE_PROD_CLOUDFLARE_API_TOKEN }}
+
+  forge-test:
+    uses: ./.github/workflows/terraform.yml
+    with:
+      env: forge-test
+      workspace: forge-test
+      network: test
+      did: did:web:registrar.test.storacha.network
+      apply: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'forge-production') }}
+    secrets:
+      aws-account-id: ${{ secrets.FORGE_TEST_AWS_ACCOUNT_ID }}
+      aws-region: ${{ secrets.FORGE_TEST_AWS_REGION }}
+      region: ${{ secrets.FORGE_TEST_AWS_REGION }}
+      private-key: ${{ secrets.FORGE_TEST_PRIVATE_KEY }}
+      indexing-service-proof: ${{ secrets.FORGE_TEST_INDEXING_SERVICE_PROOF }}
+      egress-tracking-service-proof: ${{ secrets.FORGE_TEST_EGRESS_TRACKING_SERVICE_PROOF }}
+      cloudflare-zone-id: ${{ secrets.FORGE_TEST_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.FORGE_TEST_CLOUDFLARE_API_TOKEN }}

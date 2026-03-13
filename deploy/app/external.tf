@@ -1,6 +1,6 @@
 locals {
-    providerinfo_table_name = "${terraform.workspace == "forge-prod" ? "forge-prod-upload-api-storage-provider" : "staging-warm-upload-api-storage-provider"}"
-    providerinfo_table_region = "${terraform.workspace == "forge-prod" ? "us-west-2" : "us-east-2"}"
+    providerinfo_table_name = "${terraform.workspace == "forge-test" ? "forge-test-w3infra-storage-provider" : (terraform.workspace == "forge-prod" ? "forge-prod-upload-api-storage-provider" : "staging-warm-upload-api-storage-provider")}"
+    providerinfo_table_region = "${(terraform.workspace == "forge-test" || terraform.workspace == "forge-prod") ? "us-west-2" : "us-east-2"}"
 }
 
 provider "aws" {
